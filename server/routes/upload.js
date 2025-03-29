@@ -85,16 +85,16 @@ router.post('/logo', authenticateToken, upload.single('logo'), async (req, res) 
       return res.status(400).json({ message: 'No file uploaded.' });
     }
     
-    let logoPath;
+    let imagePath;
     
     if (isProduction) {
       // In production, we can't save files to disk
       // Instead, we'll save a placeholder and in a real app
       // you would use a cloud storage service like S3
-      logoPath = `/placeholder-${uuidv4()}.png`;
+      imagePath = `/placeholder-${uuidv4()}.png`;
     } else {
       // In development, use the file path on disk
-      logoPath = `/uploads/${req.file.filename}`;
+      imagePath = `/uploads/${req.file.filename}`;
     }
     
     // Update user with logo path
@@ -103,13 +103,13 @@ router.post('/logo', authenticateToken, upload.single('logo'), async (req, res) 
         id: req.user.id
       },
       data: {
-        logoPath
+        image: imagePath
       }
     });
     
     res.json({ 
       message: 'Logo uploaded successfully.',
-      logoPath
+      imagePath
     });
   } catch (error) {
     console.error('Upload error:', error);
@@ -125,15 +125,15 @@ router.get('/logo', authenticateToken, async (req, res) => {
         id: req.user.id
       },
       select: {
-        logoPath: true
+        image: true
       }
     });
     
-    if (!user || !user.logoPath) {
+    if (!user || !user.image) {
       return res.status(404).json({ message: 'No logo found.' });
     }
     
-    res.json({ logoPath: user.logoPath });
+    res.json({ imagePath: user.image });
   } catch (error) {
     console.error('Get logo error:', error);
     res.status(500).json({ message: 'Failed to retrieve logo.' });
@@ -148,18 +148,18 @@ router.delete('/logo', authenticateToken, async (req, res) => {
         id: req.user.id
       },
       select: {
-        logoPath: true
+        image: true
       }
     });
     
-    if (!user || !user.logoPath) {
+    if (!user || !user.image) {
       return res.status(404).json({ message: 'No logo found.' });
     }
     
     // Only attempt to delete the file in development environment
-    if (!isProduction && user.logoPath.startsWith('/uploads/')) {
+    if (!isProduction && user.image.startsWith('/uploads/')) {
       // Get the file path
-      const filePath = path.join(__dirname, '..', user.logoPath);
+      const filePath = path.join(__dirname, '..', user.image);
       
       // Delete the file if it exists
       if (fs.existsSync(filePath)) {
@@ -173,7 +173,7 @@ router.delete('/logo', authenticateToken, async (req, res) => {
         id: req.user.id
       },
       data: {
-        logoPath: null
+        image: null
       }
     });
     

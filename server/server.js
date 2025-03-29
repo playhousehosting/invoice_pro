@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const prisma = require('./prisma/client');
+const { authenticateToken } = require('./middleware/auth');
 
 const authRoutes = require('./routes/auth');
 const invoiceRoutes = require('./routes/invoice');
@@ -37,9 +38,10 @@ app.get('/', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
-app.use('/api/invoice', invoiceRoutes);
-app.use('/api/address-book', addressBookRoutes);
-app.use('/api/upload', uploadRoutes);
+// Protected routes - require authentication
+app.use('/api/invoice', authenticateToken, invoiceRoutes);
+app.use('/api/address-book', authenticateToken, addressBookRoutes);
+app.use('/api/upload', authenticateToken, uploadRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

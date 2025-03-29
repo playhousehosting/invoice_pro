@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
+import api from '../utils/api';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -11,13 +11,19 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Use relative URL for API calls to work in both development and production
-      const res = await axios.post('/api/auth/login', {
+      const res = await api.post('/api/auth/login', {
         email,
         password
       });
-      localStorage.setItem('token', res.data.token);
-      navigate('/invoice');
+      
+      if (res.data && res.data.token) {
+        localStorage.setItem('token', res.data.token);
+        // Ensure the token is immediately available for subsequent requests
+        api.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+        navigate('/invoice');
+      } else {
+        setMessage('Invalid response from server');
+      }
     } catch (err) {
       console.error('Login error:', err);
       setMessage(err.response?.data?.message || 'Login failed. Please check your connection and try again.');

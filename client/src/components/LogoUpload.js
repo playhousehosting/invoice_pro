@@ -18,11 +18,11 @@ function LogoUpload({ onLogoChange }) {
       if (!token) return;
 
       const response = await api.get('/api/upload/logo');
-      if (response.data.logoPath) {
+      if (response.data.imagePath) {
         setHasLogo(true);
-        setPreviewUrl(getAssetUrl(response.data.logoPath));
+        setPreviewUrl(getAssetUrl(response.data.imagePath));
         if (onLogoChange) {
-          onLogoChange(response.data.logoPath);
+          onLogoChange(response.data.imagePath);
         }
       }
     } catch (err) {
@@ -86,9 +86,9 @@ function LogoUpload({ onLogoChange }) {
       setMessage('Logo uploaded successfully');
       setHasLogo(true);
       setSelectedFile(null);
-      if (response.data && response.data.logoPath) {
+      if (response.data && response.data.imagePath) {
         if (onLogoChange) {
-          onLogoChange(response.data.logoPath);
+          onLogoChange(response.data.imagePath);
         }
       }
     } catch (err) {

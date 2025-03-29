@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
+import api from '../utils/api';
 
 function Register() {
   const [email, setEmail] = useState('');
@@ -12,8 +12,12 @@ function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Use relative URL for API calls to work in both development and production
-      await axios.post('/api/auth/register', { email, name, password });
+      const res = await api.post('/api/auth/register', { 
+        email, 
+        name, 
+        password 
+      });
+      
       setMessage('Registration successful. Please log in.');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {

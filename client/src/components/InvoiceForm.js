@@ -18,7 +18,7 @@ function InvoiceForm() {
   const [total, setTotal] = useState(0);
   const [message, setMessage] = useState('');
   const [showContactModal, setShowContactModal] = useState(false);
-  const [logoPath, setLogoPath] = useState('');
+  const [imagePath, setImagePath] = useState('');
 
   const calculateTotal = () => {
     const totalAmount = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
@@ -66,10 +66,10 @@ function InvoiceForm() {
     let startY = 20;
     
     // Add company logo if available
-    if (logoPath) {
+    if (imagePath) {
       try {
         // Add logo to PDF (adjust positioning as needed)
-        const logoUrl = getAssetUrl(logoPath);
+        const logoUrl = getAssetUrl(imagePath);
         
         // Create an image element to get dimensions
         const img = new Image();
@@ -186,7 +186,7 @@ function InvoiceForm() {
   };
 
   const handleLogoChange = (path) => {
-    setLogoPath(path);
+    setImagePath(path);
   };
 
   const handleSelectContact = (contact) => {
