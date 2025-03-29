@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 
 function Login() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
@@ -13,7 +13,7 @@ function Login() {
     try {
       // Use relative URL for API calls to work in both development and production
       const res = await axios.post('/api/auth/login', {
-        username,
+        email,
         password
       });
       localStorage.setItem('token', res.data.token);
@@ -36,14 +36,14 @@ function Login() {
               {message && <div className="alert alert-danger">{message}</div>}
               <form onSubmit={handleSubmit}>
                 <div className="mb-3">
-                  <label htmlFor="username" className="form-label">Username</label>
+                  <label htmlFor="email" className="form-label">Email</label>
                   <input
-                    type="text"
+                    type="email"
                     className="form-control"
-                    id="username"
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>

@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const prisma = require('../prisma/client');
+const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
 
@@ -11,15 +12,15 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
 // Registration endpoint
 router.post('/register', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { email, password, name } = req.body;
     
-    if (!username || !password) {
-      return res.status(400).json({ message: 'Username and password are required.' });
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
     }
     
     // Check if user exists
     const userExists = await prisma.user.findUnique({
-      where: { username }
+      where: { email }
     });
     
     if (userExists) {
@@ -32,7 +33,9 @@ router.post('/register', async (req, res) => {
     // Create new user in database
     const newUser = await prisma.user.create({
       data: {
-        username,
+        id: uuidv4(),
+        email,
+        name,
         password: hashedPassword
       }
     });
@@ -54,15 +57,15 @@ router.post('/register', async (req, res) => {
 // Login endpoint
 router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
     
-    if (!username || !password) {
-      return res.status(400).json({ message: 'Username and password are required.' });
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
     }
     
-    // Find user by username
+    // Find user by email
     const user = await prisma.user.findUnique({
-      where: { username }
+      where: { email }
     });
     
     if (!user) {
@@ -78,7 +81,7 @@ router.post('/login', async (req, res) => {
     
     // Generate JWT token
     const token = jwt.sign(
-      { id: user.id, username: user.username }, 
+      { id: user.id, email: user.email }, 
       JWT_SECRET, 
       { expiresIn: '24h' }
     );
@@ -87,7 +90,8 @@ router.post('/login', async (req, res) => {
       token,
       user: {
         id: user.id,
-        username: user.username
+        email: user.email,
+        name: user.name
       }
     });
   } catch (error) {
@@ -118,7 +122,8 @@ router.get('/me', async (req, res) => {
       where: { id: decoded.id },
       select: {
         id: true,
-        username: true,
+        email: true,
+        name: true,
         createdAt: true
       }
     });

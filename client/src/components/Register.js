@@ -3,7 +3,8 @@ import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 
 function Register() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
@@ -12,7 +13,7 @@ function Register() {
     e.preventDefault();
     try {
       // Use relative URL for API calls to work in both development and production
-      await axios.post('/api/auth/register', { username, password });
+      await axios.post('/api/auth/register', { email, name, password });
       setMessage('Registration successful. Please log in.');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
@@ -33,14 +34,26 @@ function Register() {
               {message && <div className={`alert ${message.includes('successful') ? 'alert-success' : 'alert-danger'}`}>{message}</div>}
               <form onSubmit={handleSubmit}>
                 <div className="mb-3">
-                  <label htmlFor="username" className="form-label">Username</label>
+                  <label htmlFor="email" className="form-label">Email</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    id="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="mb-3">
+                  <label htmlFor="name" className="form-label">Full Name</label>
                   <input
                     type="text"
                     className="form-control"
-                    id="username"
-                    placeholder="Choose a username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="name"
+                    placeholder="Enter your full name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     required
                   />
                 </div>
