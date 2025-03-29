@@ -1,5 +1,5 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const prisma = require('../prisma/client');
@@ -32,7 +32,8 @@ router.post('/register', async (req, res) => {
     const isFirstUser = userCount === 0;
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
     // Create user
     const user = await prisma.user.create({
