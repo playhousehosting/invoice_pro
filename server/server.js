@@ -11,6 +11,7 @@ const invoiceRoutes = require('./routes/invoice');
 const addressBookRoutes = require('./routes/addressBook');
 const adminRoutes = require('./routes/admin');
 const uploadRoutes = require('./routes/upload');
+const templateRoutes = require('./routes/template');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -44,6 +45,7 @@ app.use('/api/invoice', authenticateToken, invoiceRoutes);
 app.use('/api/address-book', authenticateToken, addressBookRoutes);
 app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
+app.use('/api/templates', authenticateToken, templateRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

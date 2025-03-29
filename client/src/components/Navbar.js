@@ -1,12 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import api from '../utils/api';
 
 function Navbar() {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        if (token) {
+          const response = await api.get('/api/auth/me');
+          setUser(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching user:', error);
+      }
+    };
+
+    fetchUser();
+  }, [token]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    setUser(null);
     navigate('/login');
   };
 
@@ -27,17 +45,30 @@ function Navbar() {
             <li className="nav-item">
               <Link className="nav-link" to="/">Home</Link>
             </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/create">Create Invoice</Link>
-            </li>
-            {token ? (
+            {token && (
               <>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/create">Create Invoice</Link>
+                </li>
                 <li className="nav-item">
                   <Link className="nav-link" to="/dashboard">Dashboard</Link>
                 </li>
                 <li className="nav-item">
                   <Link className="nav-link" to="/address-book">Address Book</Link>
                 </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/templates">Templates</Link>
+                </li>
+                {user?.role === 'ADMIN' && (
+                  <>
+                    <li className="nav-item">
+                      <Link className="nav-link" to="/admin">Admin Dashboard</Link>
+                    </li>
+                    <li className="nav-item">
+                      <Link className="nav-link" to="/setup-admin">Setup Admin</Link>
+                    </li>
+                  </>
+                )}
                 <li className="nav-item">
                   <button 
                     className="btn btn-outline-light ms-2" 
@@ -47,13 +78,14 @@ function Navbar() {
                   </button>
                 </li>
               </>
-            ) : (
+            )}
+            {!token && (
               <>
                 <li className="nav-item">
                   <Link className="nav-link" to="/login">Login</Link>
                 </li>
                 <li className="nav-item">
-                  <Link className="nav-link btn btn-outline-light ms-2" to="/register">Register</Link>
+                  <Link className="nav-link" to="/register">Register</Link>
                 </li>
               </>
             )}

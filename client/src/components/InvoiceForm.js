@@ -19,6 +19,8 @@ function InvoiceForm() {
   const [message, setMessage] = useState('');
   const [showContactModal, setShowContactModal] = useState(false);
   const [imagePath, setImagePath] = useState('');
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
 
   const calculateTotal = () => {
     const totalAmount = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
@@ -194,6 +196,33 @@ function InvoiceForm() {
     setShowContactModal(false);
   };
 
+  const handleTemplateChange = (e) => {
+    const templateId = e.target.value;
+    setSelectedTemplate(templateId);
+
+    if (templateId) {
+      const template = templates.find(t => t.id === templateId);
+      if (template) {
+        setCompanyInfo(template.companyInfo);
+        setItems(template.items);
+      }
+    }
+  };
+
+  useEffect(() => {
+    // Load templates
+    const fetchTemplates = async () => {
+      try {
+        const response = await api.get('/api/templates');
+        setTemplates(response.data);
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+      }
+    };
+
+    fetchTemplates();
+  }, []);
+
   return (
     <div className="container mt-4">
       <h1 className="mb-4">Create Invoice</h1>
@@ -288,6 +317,26 @@ function InvoiceForm() {
                   placeholder="Enter client name or company"
                 />
               </div>
+            </div>
+          </div>
+          
+          <div className="card shadow-sm mb-4">
+            <div className="card-header bg-light">
+              <h5 className="mb-0">Select Template</h5>
+            </div>
+            <div className="card-body">
+              <select
+                className="form-select"
+                value={selectedTemplate}
+                onChange={handleTemplateChange}
+              >
+                <option value="">No Template</option>
+                {templates.map(template => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           
