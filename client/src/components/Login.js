@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
+import api from '../utils/api';
 
 function Login() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
@@ -11,14 +11,22 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', {
-        username,
+      const res = await api.post('/api/auth/login', {
+        email,
         password
       });
-      localStorage.setItem('token', res.data.token);
-      navigate('/invoice');
+      
+      if (res.data && res.data.token) {
+        localStorage.setItem('token', res.data.token);
+        // Ensure the token is immediately available for subsequent requests
+        api.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+        navigate('/invoice');
+      } else {
+        setMessage('Invalid response from server');
+      }
     } catch (err) {
-      setMessage(err.response?.data?.message || 'Login failed');
+      console.error('Login error:', err);
+      setMessage(err.response?.data?.message || 'Login failed. Please check your connection and try again.');
     }
   };
 
@@ -34,14 +42,14 @@ function Login() {
               {message && <div className="alert alert-danger">{message}</div>}
               <form onSubmit={handleSubmit}>
                 <div className="mb-3">
-                  <label htmlFor="username" className="form-label">Username</label>
+                  <label htmlFor="email" className="form-label">Email</label>
                   <input
-                    type="text"
+                    type="email"
                     className="form-control"
-                    id="username"
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>

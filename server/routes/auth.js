@@ -1,131 +1,200 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 const prisma = require('../prisma/client');
-
 const router = express.Router();
 
 // JWT Secret from environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
 
-// Registration endpoint
+// Register endpoint
 router.post('/register', async (req, res) => {
   try {
-    const { username, password } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({ message: 'Username and password are required.' });
+    const { name, email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
     }
-    
-    // Check if user exists
-    const userExists = await prisma.user.findUnique({
-      where: { username }
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
     });
-    
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists.' });
+
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already registered.' });
     }
-    
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // Create new user in database
-    const newUser = await prisma.user.create({
+
+    // Check if this is the first user
+    const userCount = await prisma.user.count();
+    const isFirstUser = userCount === 0;
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create user
+    const user = await prisma.user.create({
       data: {
-        username,
-        password: hashedPassword
+        id: uuidv4(),
+        name,
+        email,
+        password: hashedPassword,
+        role: isFirstUser ? 'ADMIN' : 'USER', // First user gets admin role
+        updatedAt: new Date()
       }
     });
-    
+
     res.status(201).json({ 
-      message: 'User registered successfully.',
-      userId: newUser.id
+      message: 'Registration successful.',
+      isAdmin: isFirstUser // Let the client know if this was the first user
     });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ message: 'Registration failed. Please try again.' });
+    res.status(500).json({ 
+      message: 'Failed to register.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// One-time setup route to promote first admin
+router.post('/setup-admin', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Check if we already have an admin by checking the role field
+    const existingAdmin = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { role: 'ADMIN' },
+          { role: { equals: 'ADMIN' } }
+        ]
+      }
+    });
+
+    if (existingAdmin) {
+      return res.status(400).json({ message: 'An admin user already exists.' });
+    }
+
+    // Find the user to promote
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    // Promote the user to admin using raw SQL to avoid schema validation
+    await prisma.$executeRaw`UPDATE "User" SET role = 'ADMIN' WHERE id = ${user.id}`;
+
+    // Fetch the updated user
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: user.id }
+    });
+
+    res.json({
+      message: 'User promoted to admin successfully',
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        role: updatedUser.role
+      }
+    });
+  } catch (error) {
+    console.error('Setup admin error:', error);
+    res.status(500).json({
+      message: 'Failed to setup admin.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
 // Login endpoint
 router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({ message: 'Username and password are required.' });
+    const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
     }
-    
-    // Find user by username
+
+    // Find user
     const user = await prisma.user.findUnique({
-      where: { username }
+      where: { email }
     });
-    
+
     if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
+      return res.status(401).json({ message: 'Invalid email or password.' });
     }
-    
-    // Compare passwords
-    const passwordValid = await bcrypt.compare(password, user.password);
-    
-    if (!passwordValid) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
+
+    // Verify password
+    const validPassword = await bcrypt.compare(password, user.password);
+
+    if (!validPassword) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
     }
-    
-    // Generate JWT token
+
+    // Create JWT token
     const token = jwt.sign(
-      { id: user.id, username: user.username }, 
-      JWT_SECRET, 
+      { 
+        id: user.id,
+        email: user.email,
+        role: user.role
+      },
+      JWT_SECRET,
       { expiresIn: '24h' }
     );
-    
+
     res.json({ 
       token,
       user: {
         id: user.id,
-        username: user.username
+        name: user.name,
+        email: user.email,
+        role: user.role
       }
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Login failed. Please try again.' });
+    res.status(500).json({ 
+      message: 'Failed to login.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
-// Get current user info
+// Get current user endpoint
 router.get('/me', async (req, res) => {
   try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    
-    if (!token) {
-      return res.status(401).json({ message: 'Authentication required.' });
-    }
-    
-    // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET);
-    
-    // Get user from database
     const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
+      where: { id: req.user.id },
       select: {
         id: true,
-        username: true,
-        createdAt: true
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+        image: true
       }
     });
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found.' });
     }
-    
-    res.json({ user });
+
+    res.json(user);
   } catch (error) {
-    console.error('Auth error:', error);
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ message: 'Invalid token.' });
-    }
-    res.status(500).json({ message: 'Authentication failed.' });
+    console.error('Get user error:', error);
+    res.status(500).json({ 
+      message: 'Failed to get user information.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

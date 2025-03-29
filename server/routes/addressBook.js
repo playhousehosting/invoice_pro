@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 const prisma = require('../prisma/client');
 
 const router = express.Router();
@@ -28,19 +29,18 @@ const authenticateToken = (req, res, next) => {
 // Get all contacts for the current user
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const userContacts = await prisma.contact.findMany({
-      where: {
-        userId: req.user.id
-      },
-      orderBy: {
-        name: 'asc'
-      }
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
     });
-    
-    res.json(userContacts);
+
+    const contacts = user?.preferences?.contacts || [];
+    res.json(contacts.sort((a, b) => a.name.localeCompare(b.name)));
   } catch (error) {
     console.error('Get contacts error:', error);
-    res.status(500).json({ message: 'Failed to retrieve contacts.' });
+    res.status(500).json({ 
+      message: 'Failed to retrieve contacts.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -52,35 +52,61 @@ router.post('/', authenticateToken, async (req, res) => {
     if (!name) {
       return res.status(400).json({ message: 'Contact name is required.' });
     }
+
+    // Get current user
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    });
+
+    // Initialize contacts array if it doesn't exist
+    const currentPreferences = user.preferences || {};
+    const contacts = currentPreferences.contacts || [];
     
-    const newContact = await prisma.contact.create({
+    // Create new contact
+    const newContact = {
+      id: uuidv4(),
+      name,
+      email: email || null,
+      address: address || null,
+      phone: phone || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Add new contact to array
+    contacts.push(newContact);
+
+    // Update user preferences
+    await prisma.user.update({
+      where: { id: req.user.id },
       data: {
-        userId: req.user.id,
-        name,
-        email: email || null,
-        address: address || null,
-        phone: phone || null
+        preferences: {
+          ...currentPreferences,
+          contacts
+        }
       }
     });
     
     res.status(201).json(newContact);
   } catch (error) {
     console.error('Create contact error:', error);
-    res.status(500).json({ message: 'Failed to create contact.' });
+    res.status(500).json({ 
+      message: 'Failed to create contact.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
 // Get a specific contact by ID
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const contactId = parseInt(req.params.id);
+    const { id } = req.params;
     
-    const contact = await prisma.contact.findFirst({
-      where: {
-        id: contactId,
-        userId: req.user.id
-      }
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
     });
+
+    const contact = user?.preferences?.contacts?.find(c => c.id === id);
     
     if (!contact) {
       return res.status(404).json({ message: 'Contact not found.' });
@@ -89,80 +115,112 @@ router.get('/:id', authenticateToken, async (req, res) => {
     res.json(contact);
   } catch (error) {
     console.error('Get contact error:', error);
-    res.status(500).json({ message: 'Failed to retrieve contact.' });
+    res.status(500).json({ 
+      message: 'Failed to retrieve contact.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
 // Update a contact
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
-    const contactId = parseInt(req.params.id);
+    const { id } = req.params;
     const { name, email, address, phone } = req.body;
     
     if (!name) {
       return res.status(400).json({ message: 'Contact name is required.' });
     }
-    
-    // Check if contact exists and belongs to user
-    const existingContact = await prisma.contact.findFirst({
-      where: {
-        id: contactId,
-        userId: req.user.id
-      }
+
+    // Get current user
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
     });
+
+    // Get current contacts
+    const currentPreferences = user.preferences || {};
+    const contacts = currentPreferences.contacts || [];
     
-    if (!existingContact) {
+    // Find contact index
+    const contactIndex = contacts.findIndex(c => c.id === id);
+    
+    if (contactIndex === -1) {
       return res.status(404).json({ message: 'Contact not found.' });
     }
-    
-    // Update the contact
-    const updatedContact = await prisma.contact.update({
-      where: {
-        id: contactId
-      },
+
+    // Update contact
+    contacts[contactIndex] = {
+      ...contacts[contactIndex],
+      name,
+      email: email || null,
+      address: address || null,
+      phone: phone || null,
+      updatedAt: new Date()
+    };
+
+    // Update user preferences
+    const updatedUser = await prisma.user.update({
+      where: { id: req.user.id },
       data: {
-        name,
-        email: email || null,
-        address: address || null,
-        phone: phone || null
+        preferences: {
+          ...currentPreferences,
+          contacts
+        }
       }
     });
     
-    res.json(updatedContact);
+    res.json(contacts[contactIndex]);
   } catch (error) {
     console.error('Update contact error:', error);
-    res.status(500).json({ message: 'Failed to update contact.' });
+    res.status(500).json({ 
+      message: 'Failed to update contact.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
 // Delete a contact
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
-    const contactId = parseInt(req.params.id);
+    const { id } = req.params;
     
-    // Check if contact exists and belongs to user
-    const contact = await prisma.contact.findFirst({
-      where: {
-        id: contactId,
-        userId: req.user.id
-      }
+    // Get current user
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
     });
+
+    // Get current contacts
+    const currentPreferences = user.preferences || {};
+    const contacts = currentPreferences.contacts || [];
     
-    if (!contact) {
+    // Find contact index
+    const contactIndex = contacts.findIndex(c => c.id === id);
+    
+    if (contactIndex === -1) {
       return res.status(404).json({ message: 'Contact not found.' });
     }
-    
-    // Delete the contact
-    await prisma.contact.delete({
-      where: {
-        id: contactId
+
+    // Remove contact from array
+    contacts.splice(contactIndex, 1);
+
+    // Update user preferences
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        preferences: {
+          ...currentPreferences,
+          contacts
+        }
       }
     });
     
     res.status(204).send();
   } catch (error) {
     console.error('Delete contact error:', error);
-    res.status(500).json({ message: 'Failed to delete contact.' });
+    res.status(500).json({ 
+      message: 'Failed to delete contact.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

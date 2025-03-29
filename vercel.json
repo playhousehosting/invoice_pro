@@ -2,8 +2,11 @@
   "version": 2,
   "builds": [
     {
-      "src": "server/server.js",
-      "use": "@vercel/node"
+      "src": "server/vercel-server.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["server/prisma/**/*"]
+      }
     },
     {
       "src": "client/package.json",
@@ -16,11 +19,31 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "server/server.js"
+      "dest": "server/vercel-server.js"
+    },
+    {
+      "src": "^/static/(.*)",
+      "dest": "client/static/$1"
+    },
+    {
+      "src": "^/favicon.ico",
+      "dest": "client/favicon.ico"
+    },
+    {
+      "src": "^/manifest.json",
+      "dest": "client/manifest.json"
+    },
+    {
+      "src": "^/robots.txt",
+      "dest": "client/robots.txt"
     },
     {
       "src": "/(.*)",
-      "dest": "client/$1"
+      "dest": "client/index.html"
     }
-  ]
+  ],
+  "env": {
+    "VERCEL": "1",
+    "NODE_ENV": "production"
+  }
 }

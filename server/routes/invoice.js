@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const prisma = require('../prisma/client');
+const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
 
@@ -25,62 +26,89 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
+
 // Create invoice endpoint
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { client, companyInfo, items, total } = req.body;
     
     if (!client || !items || !total) {
       return res.status(400).json({ message: 'Missing invoice data.' });
     }
+
+    // Get current user
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    });
+
+    // Initialize invoices array if it doesn't exist
+    const currentPreferences = user.preferences || {};
+    const invoices = currentPreferences.invoices || [];
     
-    const newInvoice = await prisma.invoice.create({
+    // Create new invoice
+    const newInvoice = {
+      id: uuidv4(),
+      client,
+      companyInfo,
+      items,
+      total,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Add new invoice to array
+    invoices.push(newInvoice);
+
+    // Update user preferences
+    const updatedUser = await prisma.user.update({
+      where: { id: req.user.id },
       data: {
-        userId: req.user.id,
-        client,
-        companyInfo,
-        items,
-        total
+        preferences: {
+          ...currentPreferences,
+          invoices
+        }
       }
     });
     
     res.status(201).json(newInvoice);
   } catch (error) {
     console.error('Create invoice error:', error);
-    res.status(500).json({ message: 'Failed to create invoice.' });
+    res.status(500).json({ 
+      message: 'Failed to create invoice.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
 // Get all invoices for current user
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const userInvoices = await prisma.invoice.findMany({
-      where: {
-        userId: req.user.id
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
     });
-    
-    res.json(userInvoices);
+
+    const invoices = user?.preferences?.invoices || [];
+    res.json(invoices.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
   } catch (error) {
     console.error('Get invoices error:', error);
-    res.status(500).json({ message: 'Failed to retrieve invoices.' });
+    res.status(500).json({ 
+      message: 'Failed to retrieve invoices.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
 // Get a specific invoice by ID
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const invoiceId = parseInt(req.params.id);
-    
-    const invoice = await prisma.invoice.findFirst({
-      where: {
-        id: invoiceId,
-        userId: req.user.id
-      }
+    const { id } = req.params;
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
     });
+
+    const invoice = user?.preferences?.invoices?.find(inv => inv.id === id);
     
     if (!invoice) {
       return res.status(404).json({ message: 'Invoice not found.' });
@@ -89,38 +117,54 @@ router.get('/:id', authenticateToken, async (req, res) => {
     res.json(invoice);
   } catch (error) {
     console.error('Get invoice error:', error);
-    res.status(500).json({ message: 'Failed to retrieve invoice.' });
+    res.status(500).json({ 
+      message: 'Failed to retrieve invoice.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
 // Delete an invoice
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    const invoiceId = parseInt(req.params.id);
+    const { id } = req.params;
     
-    // Check if invoice exists and belongs to user
-    const invoice = await prisma.invoice.findFirst({
-      where: {
-        id: invoiceId,
-        userId: req.user.id
-      }
+    // Get current user and invoices
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
     });
+
+    const currentPreferences = user.preferences || {};
+    const invoices = currentPreferences.invoices || [];
     
-    if (!invoice) {
+    // Find invoice index
+    const invoiceIndex = invoices.findIndex(inv => inv.id === id);
+    
+    if (invoiceIndex === -1) {
       return res.status(404).json({ message: 'Invoice not found.' });
     }
     
-    // Delete the invoice
-    await prisma.invoice.delete({
-      where: {
-        id: invoiceId
+    // Remove invoice from array
+    invoices.splice(invoiceIndex, 1);
+    
+    // Update user preferences
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        preferences: {
+          ...currentPreferences,
+          invoices
+        }
       }
     });
     
-    res.status(204).send();
+    res.json({ message: 'Invoice deleted successfully.' });
   } catch (error) {
     console.error('Delete invoice error:', error);
-    res.status(500).json({ message: 'Failed to delete invoice.' });
+    res.status(500).json({ 
+      message: 'Failed to delete invoice.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

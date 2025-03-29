@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
+import api from '../utils/api';
 
 function Dashboard() {
   const [invoices, setInvoices] = useState([]);
@@ -10,14 +10,12 @@ function Dashboard() {
 
   useEffect(() => {
     const fetchInvoices = async () => {
-      const token = localStorage.getItem('token');
       try {
-        const response = await axios.get('http://localhost:5000/api/invoice', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await api.get('/api/invoice');
         setInvoices(response.data);
         setLoading(false);
       } catch (err) {
+        console.error('Error fetching invoices:', err);
         setError('Failed to load invoices. Please try again later.');
         setLoading(false);
       }
@@ -102,7 +100,7 @@ function Dashboard() {
           <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
-          <p className="mt-2">Loading your invoices...</p>
+          <p className="mt-2">Loading invoices...</p>
         </div>
       </div>
     );

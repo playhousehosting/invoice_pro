@@ -1,138 +1,132 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api, { getAssetUrl } from '../utils/api';
 
 function LogoUpload({ onLogoChange }) {
-  const [logo, setLogo] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [hasLogo, setHasLogo] = useState(false);
 
-  // Fetch existing logo on component mount
   useEffect(() => {
-    const fetchLogo = async () => {
+    fetchCurrentLogo();
+  }, []);
+
+  const fetchCurrentLogo = async () => {
+    try {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      try {
-        const response = await axios.get('http://localhost:5000/api/upload/logo', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        if (response.data && response.data.logoPath) {
-          setPreviewUrl(`http://localhost:5000${response.data.logoPath}`);
-          if (onLogoChange) {
-            onLogoChange(response.data.logoPath);
-          }
+      const response = await api.get('/api/upload/logo');
+      if (response.data.imagePath) {
+        setHasLogo(true);
+        setPreviewUrl(getAssetUrl(response.data.imagePath));
+        if (onLogoChange) {
+          onLogoChange(response.data.imagePath);
         }
-      } catch (error) {
-        // Logo might not exist yet, which is fine
-        console.log('No logo found');
       }
-    };
-
-    fetchLogo();
-  }, [onLogoChange]);
-
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    
-    if (!selectedFile) {
-      return;
+    } catch (err) {
+      console.error('Error fetching logo:', err);
     }
-    
-    // Check file type
-    if (!selectedFile.type.startsWith('image/')) {
-      setError('Please select an image file.');
-      return;
-    }
-    
-    // Check file size (max 5MB)
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      setError('File size should be less than 5MB.');
-      return;
-    }
-    
-    setLogo(selectedFile);
-    setPreviewUrl(URL.createObjectURL(selectedFile));
-    setError('');
   };
 
-  const handleUpload = async () => {
-    if (!logo) {
-      setError('Please select a logo to upload.');
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.match('image.*')) {
+      setMessage('Please select an image file (PNG, JPG, JPEG, GIF)');
       return;
     }
-    
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setError('You must be logged in to upload a logo.');
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setMessage('File size should be less than 2MB');
       return;
     }
-    
-    setLoading(true);
-    setError('');
-    setSuccess('');
-    
-    const formData = new FormData();
-    formData.append('logo', logo);
-    
+
+    setSelectedFile(file);
+    setMessage('');
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPreviewUrl(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    if (!selectedFile) {
+      setMessage('Please select a file to upload');
+      return;
+    }
+
+    setUploading(true);
+    setMessage('');
+
     try {
-      const response = await axios.post('http://localhost:5000/api/upload/logo', formData, {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setMessage('You must be logged in to upload a logo.');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('logo', selectedFile);
+
+      const response = await api.post('/api/upload/logo', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'multipart/form-data'
         }
       });
-      
-      setSuccess('Logo uploaded successfully!');
-      
-      if (response.data && response.data.logoPath) {
+
+      setMessage('Logo uploaded successfully');
+      setHasLogo(true);
+      setSelectedFile(null);
+      if (response.data && response.data.imagePath) {
         if (onLogoChange) {
-          onLogoChange(response.data.logoPath);
+          onLogoChange(response.data.imagePath);
         }
       }
-    } catch (error) {
-      setError('Failed to upload logo. Please try again.');
-      console.error('Upload error:', error);
+    } catch (err) {
+      console.error('Upload error:', err);
+      setMessage(err.response?.data?.message || 'Failed to upload logo');
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
   };
 
   const handleRemoveLogo = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    
-    setLoading(true);
-    setError('');
-    setSuccess('');
-    
+    if (!window.confirm('Are you sure you want to remove your logo?')) return;
+
     try {
-      await axios.delete('http://localhost:5000/api/upload/logo', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      await api.delete('/api/upload/logo');
       setPreviewUrl('');
-      setLogo(null);
-      setSuccess('Logo removed successfully!');
-      
+      setHasLogo(false);
+      setMessage('Logo removed successfully');
       if (onLogoChange) {
         onLogoChange(null);
       }
-    } catch (error) {
-      setError('Failed to remove logo. Please try again.');
-      console.error('Remove logo error:', error);
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Remove logo error:', err);
+      setMessage(err.response?.data?.message || 'Failed to remove logo');
     }
   };
 
   return (
     <div className="logo-upload">
-      {error && <div className="alert alert-danger">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
-      
+      {message && (
+        <div className={`alert ${message.includes('successfully') ? 'alert-success' : 'alert-danger'}`}>
+          {message}
+        </div>
+      )}
+
       <div className="mb-3">
         <label className="form-label">Company Logo</label>
         <div className="d-flex align-items-center">
@@ -158,16 +152,16 @@ function LogoUpload({ onLogoChange }) {
               className="form-control form-control-sm mb-2"
               accept="image/*"
               onChange={handleFileChange}
-              disabled={loading}
+              disabled={uploading}
             />
             <div className="d-flex">
               <button
                 type="button"
                 className="btn btn-primary btn-sm me-2"
                 onClick={handleUpload}
-                disabled={!logo || loading}
+                disabled={!selectedFile || uploading}
               >
-                {loading ? (
+                {uploading ? (
                   <>
                     <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
                     Uploading...
@@ -176,12 +170,12 @@ function LogoUpload({ onLogoChange }) {
                   'Upload Logo'
                 )}
               </button>
-              {previewUrl && (
+              {hasLogo && (
                 <button
                   type="button"
                   className="btn btn-outline-danger btn-sm"
                   onClick={handleRemoveLogo}
-                  disabled={loading}
+                  disabled={uploading}
                 >
                   Remove
                 </button>
@@ -190,7 +184,7 @@ function LogoUpload({ onLogoChange }) {
           </div>
         </div>
         <small className="text-muted">
-          Upload your company logo to appear on invoices. Max size: 5MB. Recommended format: PNG or JPG.
+          Upload your company logo to appear on invoices. Max size: 2MB. Recommended format: PNG or JPG.
         </small>
       </div>
     </div>

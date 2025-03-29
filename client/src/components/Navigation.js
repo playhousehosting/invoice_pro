@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 
-function Navbar() {
-  const navigate = useNavigate();
-  const token = localStorage.getItem('token');
+function Navigation() {
   const [user, setUser] = useState(null);
-
+  const navigate = useNavigate();
+  
   useEffect(() => {
     const fetchUser = async () => {
       try {
+        const token = localStorage.getItem('token');
         if (token) {
           const response = await api.get('/api/auth/me');
           setUser(response.data);
@@ -20,7 +20,7 @@ function Navbar() {
     };
 
     fetchUser();
-  }, [token]);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -31,7 +31,7 @@ function Navbar() {
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
       <div className="container">
-        <Link className="navbar-brand fw-bold" to="/">InvoicePro</Link>
+        <Link className="navbar-brand" to="/">Invoice Pro</Link>
         <button 
           className="navbar-toggler" 
           type="button" 
@@ -41,45 +41,46 @@ function Navbar() {
           <span className="navbar-toggler-icon"></span>
         </button>
         <div className="collapse navbar-collapse" id="navbarNav">
-          <ul className="navbar-nav ms-auto">
-            <li className="nav-item">
-              <Link className="nav-link" to="/">Home</Link>
-            </li>
-            {token && (
+          <ul className="navbar-nav me-auto">
+            {user ? (
               <>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/create">Create Invoice</Link>
-                </li>
-                <li className="nav-item">
-                  <Link className="nav-link" to="/dashboard">Dashboard</Link>
+                  <Link className="nav-link" to="/invoice">Create Invoice</Link>
                 </li>
                 <li className="nav-item">
                   <Link className="nav-link" to="/address-book">Address Book</Link>
                 </li>
-                <li className="nav-item">
-                  <Link className="nav-link" to="/templates">Templates</Link>
-                </li>
-                {user?.role === 'ADMIN' && (
-                  <>
-                    <li className="nav-item">
-                      <Link className="nav-link" to="/admin">Admin Dashboard</Link>
-                    </li>
-                    <li className="nav-item">
-                      <Link className="nav-link" to="/setup-admin">Setup Admin</Link>
-                    </li>
-                  </>
+                {user.role === 'ADMIN' && (
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/admin">Admin Dashboard</Link>
+                  </li>
                 )}
+              </>
+            ) : (
+              <li className="nav-item">
+                <Link className="nav-link" to="/">Home</Link>
+              </li>
+            )}
+          </ul>
+          <ul className="navbar-nav">
+            {user ? (
+              <>
+                <li className="nav-item">
+                  <span className="nav-link">
+                    Welcome, {user.name || user.email}
+                    {user.role === 'ADMIN' && ' (Admin)'}
+                  </span>
+                </li>
                 <li className="nav-item">
                   <button 
-                    className="btn btn-outline-light ms-2" 
+                    className="btn btn-link nav-link" 
                     onClick={handleLogout}
                   >
                     Logout
                   </button>
                 </li>
               </>
-            )}
-            {!token && (
+            ) : (
               <>
                 <li className="nav-item">
                   <Link className="nav-link" to="/login">Login</Link>
@@ -96,4 +97,4 @@ function Navbar() {
   );
 }
 
-export default Navbar;
+export default Navigation;

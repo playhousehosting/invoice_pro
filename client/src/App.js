@@ -7,6 +7,9 @@ import Navbar from './components/Navbar';
 import Home from './components/Home';
 import Dashboard from './components/Dashboard';
 import AddressBook from './components/AddressBook';
+import AdminDashboard from './components/AdminDashboard';
+import SetupAdmin from './components/SetupAdmin';
+import TemplateManager from './components/TemplateManager';
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -21,9 +24,13 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/create" element={<InvoiceForm />} />
+        <Route path="/create" element={<PrivateRoute><InvoiceForm /></PrivateRoute>} />
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/address-book" element={<PrivateRoute><AddressBook /></PrivateRoute>} />
+        <Route path="/admin" element={<PrivateRoute><AdminDashboard /></PrivateRoute>} />
+        <Route path="/setup-admin" element={<PrivateRoute><SetupAdmin /></PrivateRoute>} />
+        <Route path="/templates" element={<PrivateRoute><TemplateManager /></PrivateRoute>} />
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </>
   );
