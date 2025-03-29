@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { jsPDF } from 'jspdf';
 import ContactSelectionModal from './ContactSelectionModal';
+import LogoUpload from './LogoUpload';
 
 function InvoiceForm() {
   const [client, setClient] = useState('');
@@ -17,6 +18,7 @@ function InvoiceForm() {
   const [total, setTotal] = useState(0);
   const [message, setMessage] = useState('');
   const [showContactModal, setShowContactModal] = useState(false);
+  const [logoPath, setLogoPath] = useState('');
 
   const calculateTotal = () => {
     const totalAmount = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
@@ -62,78 +64,151 @@ function InvoiceForm() {
   const handleExportPDF = () => {
     const doc = new jsPDF();
     
-    // Add company header
-    doc.setFontSize(20);
-    doc.setTextColor(44, 62, 80);
-    doc.text(companyInfo.name, 105, 20, { align: 'center' });
+    let startY = 20;
     
-    doc.setFontSize(10);
-    doc.text(companyInfo.address, 105, 28, { align: 'center' });
-    doc.text(`Email: ${companyInfo.email} | Phone: ${companyInfo.phone}`, 105, 34, { align: 'center' });
-    
-    // Add horizontal line
-    doc.setDrawColor(44, 62, 80);
-    doc.line(14, 38, 196, 38);
-    
-    // Invoice title
-    doc.setFontSize(18);
-    doc.text('INVOICE', 14, 48);
-    
-    // Date and Invoice Number
-    const today = new Date();
-    const invoiceNumber = `INV-${today.getFullYear()}${(today.getMonth() + 1).toString().padStart(2, '0')}${today.getDate().toString().padStart(2, '0')}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-    
-    doc.setFontSize(10);
-    doc.text(`Date: ${today.toLocaleDateString()}`, 14, 56);
-    doc.text(`Invoice #: ${invoiceNumber}`, 14, 62);
-    
-    // Client information
-    doc.setFontSize(12);
-    doc.text('Bill To:', 14, 72);
-    doc.setFontSize(11);
-    doc.text(client, 14, 78);
-    
-    // Table header
-    let startY = 90;
-    doc.setFillColor(240, 240, 240);
-    doc.rect(14, startY, 182, 8, 'F');
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.text('Description', 16, startY + 5);
-    doc.text('Quantity', 100, startY + 5);
-    doc.text('Unit Price', 130, startY + 5);
-    doc.text('Amount', 170, startY + 5);
-    
-    startY += 10;
-    
-    // Table content
-    items.forEach((item, index) => {
-      doc.text(item.description, 16, startY + 5);
-      doc.text(item.quantity.toString(), 100, startY + 5);
-      doc.text(`$${item.price.toFixed(2)}`, 130, startY + 5);
-      doc.text(`$${(item.quantity * item.price).toFixed(2)}`, 170, startY + 5);
-      startY += 10;
-      
-      // Add light gray line
-      if (index < items.length - 1) {
-        doc.setDrawColor(220, 220, 220);
-        doc.line(14, startY, 196, startY);
+    // Add company logo if available
+    if (logoPath) {
+      try {
+        // Add logo to PDF (adjust positioning as needed)
+        const logoUrl = `http://localhost:5000${logoPath}`;
+        
+        // Create an image element to get dimensions
+        const img = new Image();
+        img.src = logoUrl;
+        
+        // Add logo asynchronously when image loads
+        img.onload = function() {
+          // Calculate dimensions to maintain aspect ratio but limit size
+          const maxWidth = 60;
+          const maxHeight = 40;
+          
+          let imgWidth = img.width;
+          let imgHeight = img.height;
+          
+          if (imgWidth > maxWidth) {
+            const ratio = maxWidth / imgWidth;
+            imgWidth = maxWidth;
+            imgHeight = imgHeight * ratio;
+          }
+          
+          if (imgHeight > maxHeight) {
+            const ratio = maxHeight / imgHeight;
+            imgHeight = maxHeight;
+            imgWidth = imgWidth * ratio;
+          }
+          
+          // Add image to PDF
+          doc.addImage(logoUrl, 'PNG', 14, 14, imgWidth, imgHeight);
+          
+          // Continue with the rest of the PDF generation
+          finalizePDF();
+        };
+        
+        // Handle image loading error
+        img.onerror = function() {
+          console.error('Error loading logo image');
+          finalizePDF();
+        };
+      } catch (error) {
+        console.error('Error adding logo to PDF:', error);
+        finalizePDF();
       }
-    });
+    } else {
+      finalizePDF();
+    }
     
-    // Total
-    doc.setDrawColor(44, 62, 80);
-    doc.line(14, startY + 2, 196, startY + 2);
-    doc.setFontSize(12);
-    doc.setTextColor(44, 62, 80);
-    doc.text(`Total: $${total.toFixed(2)}`, 170, startY + 10);
-    
-    // Footer
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text('Thank you for your business!', 105, 270, { align: 'center' });
-    
-    doc.save('invoice.pdf');
+    function finalizePDF() {
+      // Add company header
+      doc.setFontSize(20);
+      doc.setTextColor(44, 62, 80);
+      
+      // If logo exists, position text to the right of the logo
+      if (logoPath) {
+        doc.text(companyInfo.name, 105, 25, { align: 'center' });
+        
+        doc.setFontSize(10);
+        doc.text(companyInfo.address, 105, 33, { align: 'center' });
+        doc.text(`Email: ${companyInfo.email} | Phone: ${companyInfo.phone}`, 105, 39, { align: 'center' });
+        
+        // Add horizontal line
+        doc.setDrawColor(44, 62, 80);
+        doc.line(14, 48, 196, 48);
+        
+        startY = 58; // Adjust starting Y position for the rest of the content
+      } else {
+        doc.text(companyInfo.name, 105, 20, { align: 'center' });
+        
+        doc.setFontSize(10);
+        doc.text(companyInfo.address, 105, 28, { align: 'center' });
+        doc.text(`Email: ${companyInfo.email} | Phone: ${companyInfo.phone}`, 105, 34, { align: 'center' });
+        
+        // Add horizontal line
+        doc.setDrawColor(44, 62, 80);
+        doc.line(14, 38, 196, 38);
+        
+        startY = 48; // Default starting Y position
+      }
+      
+      // Invoice title
+      doc.setFontSize(18);
+      doc.text('INVOICE', 14, startY + 10);
+      
+      // Date and Invoice Number
+      const today = new Date();
+      const invoiceNumber = `INV-${today.getFullYear()}${(today.getMonth() + 1).toString().padStart(2, '0')}${today.getDate().toString().padStart(2, '0')}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+      
+      doc.setFontSize(10);
+      doc.text(`Date: ${today.toLocaleDateString()}`, 14, startY + 18);
+      doc.text(`Invoice #: ${invoiceNumber}`, 14, startY + 24);
+      
+      // Client information
+      doc.setFontSize(12);
+      doc.text('Bill To:', 14, startY + 34);
+      doc.setFontSize(11);
+      doc.text(client, 14, startY + 40);
+      
+      // Table header
+      let tableStartY = startY + 50;
+      doc.setFillColor(240, 240, 240);
+      doc.rect(14, tableStartY, 182, 8, 'F');
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      doc.text('Description', 16, tableStartY + 5);
+      doc.text('Quantity', 100, tableStartY + 5);
+      doc.text('Unit Price', 130, tableStartY + 5);
+      doc.text('Amount', 170, tableStartY + 5);
+      
+      tableStartY += 10;
+      
+      // Table content
+      items.forEach((item, index) => {
+        doc.text(item.description, 16, tableStartY + 5);
+        doc.text(item.quantity.toString(), 100, tableStartY + 5);
+        doc.text(`$${item.price.toFixed(2)}`, 130, tableStartY + 5);
+        doc.text(`$${(item.quantity * item.price).toFixed(2)}`, 170, tableStartY + 5);
+        tableStartY += 10;
+        
+        // Add light gray line
+        if (index < items.length - 1) {
+          doc.setDrawColor(220, 220, 220);
+          doc.line(14, tableStartY, 196, tableStartY);
+        }
+      });
+      
+      // Total
+      doc.setDrawColor(44, 62, 80);
+      doc.line(14, tableStartY + 2, 196, tableStartY + 2);
+      doc.setFontSize(12);
+      doc.setTextColor(44, 62, 80);
+      doc.text(`Total: $${total.toFixed(2)}`, 170, tableStartY + 10);
+      
+      // Footer
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Thank you for your business!', 105, 270, { align: 'center' });
+      
+      doc.save('invoice.pdf');
+    }
   };
 
   const handleSelectContact = (contact) => {
@@ -170,6 +245,12 @@ ${contact.email ? `Email: ${contact.email}` : ''}`.trim();
           <div className="row mb-4">
             <div className="col-md-6">
               <h5>Your Company Information</h5>
+              
+              {/* Logo Upload Component */}
+              {localStorage.getItem('token') && (
+                <LogoUpload onLogoChange={(path) => setLogoPath(path)} />
+              )}
+              
               <div className="form-group mb-2">
                 <input
                   type="text"
