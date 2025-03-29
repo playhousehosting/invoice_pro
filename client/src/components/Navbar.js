@@ -59,6 +59,9 @@ function Navbar() {
                 <li className="nav-item">
                   <Link className="nav-link" to="/templates">Templates</Link>
                 </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/catalog">Catalog</Link>
+                </li>
                 {user?.role === 'ADMIN' && (
                   <>
                     <li className="nav-item">
