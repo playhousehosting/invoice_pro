@@ -43,7 +43,11 @@ router.post('/register', async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ message: 'Registration failed. Please try again.' });
+    // Return more detailed error information to help with debugging
+    res.status(500).json({ 
+      message: 'Registration failed. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -88,7 +92,11 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Login failed. Please try again.' });
+    // Return more detailed error information to help with debugging
+    res.status(500).json({ 
+      message: 'Login failed. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -125,7 +133,11 @@ router.get('/me', async (req, res) => {
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ message: 'Invalid token.' });
     }
-    res.status(500).json({ message: 'Authentication failed.' });
+    // Return more detailed error information to help with debugging
+    res.status(500).json({ 
+      message: 'Authentication failed.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
