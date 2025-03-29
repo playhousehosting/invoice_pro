@@ -7,6 +7,7 @@ import Navbar from './components/Navbar';
 import Home from './components/Home';
 import Dashboard from './components/Dashboard';
 import AddressBook from './components/AddressBook';
+import AdminDashboard from './components/AdminDashboard';
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -24,6 +25,7 @@ function App() {
         <Route path="/create" element={<InvoiceForm />} />
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/address-book" element={<PrivateRoute><AddressBook /></PrivateRoute>} />
+        <Route path="/admin" element={<AdminDashboard />} />
       </Routes>
     </>
   );

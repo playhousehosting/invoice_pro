@@ -9,6 +9,7 @@ const { authenticateToken } = require('./middleware/auth');
 const authRoutes = require('./routes/auth');
 const invoiceRoutes = require('./routes/invoice');
 const addressBookRoutes = require('./routes/addressBook');
+const adminRoutes = require('./routes/admin');
 const uploadRoutes = require('./routes/upload');
 
 const app = express();
@@ -41,6 +42,7 @@ app.use('/api/auth', authRoutes);
 // Protected routes - require authentication
 app.use('/api/invoice', authenticateToken, invoiceRoutes);
 app.use('/api/address-book', authenticateToken, addressBookRoutes);
+app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
 
 // Error handling middleware
