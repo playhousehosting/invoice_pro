@@ -143,6 +143,5 @@ model users {
 
 enum UserRole {
   USER
-  BUSINESS_OWNER
   ADMIN
 }

@@ -60,6 +60,59 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// One-time setup route to promote first admin
+router.post('/setup-admin', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Check if we already have an admin by checking the role field
+    const existingAdmin = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { role: 'ADMIN' },
+          { role: { equals: 'ADMIN' } }
+        ]
+      }
+    });
+
+    if (existingAdmin) {
+      return res.status(400).json({ message: 'An admin user already exists.' });
+    }
+
+    // Find the user to promote
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    // Promote the user to admin using raw SQL to avoid schema validation
+    await prisma.$executeRaw`UPDATE "User" SET role = 'ADMIN' WHERE id = ${user.id}`;
+
+    // Fetch the updated user
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: user.id }
+    });
+
+    res.json({
+      message: 'User promoted to admin successfully',
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        role: updatedUser.role
+      }
+    });
+  } catch (error) {
+    console.error('Setup admin error:', error);
+    res.status(500).json({
+      message: 'Failed to setup admin.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Login endpoint
 router.post('/login', async (req, res) => {
   try {

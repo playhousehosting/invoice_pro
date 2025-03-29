@@ -8,6 +8,7 @@ import Home from './components/Home';
 import Dashboard from './components/Dashboard';
 import AddressBook from './components/AddressBook';
 import AdminDashboard from './components/AdminDashboard';
+import SetupAdmin from './components/SetupAdmin';
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -26,6 +27,7 @@ function App() {
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/address-book" element={<PrivateRoute><AddressBook /></PrivateRoute>} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/setup-admin" element={<SetupAdmin />} />
       </Routes>
     </>
   );
