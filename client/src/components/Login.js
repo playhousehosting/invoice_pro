@@ -11,14 +11,16 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', {
+      // Use relative URL for API calls to work in both development and production
+      const res = await axios.post('/api/auth/login', {
         username,
         password
       });
       localStorage.setItem('token', res.data.token);
       navigate('/invoice');
     } catch (err) {
-      setMessage(err.response?.data?.message || 'Login failed');
+      console.error('Login error:', err);
+      setMessage(err.response?.data?.message || 'Login failed. Please check your connection and try again.');
     }
   };
 

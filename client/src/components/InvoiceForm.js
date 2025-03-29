@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { jsPDF } from 'jspdf';
 import ContactSelectionModal from './ContactSelectionModal';
 import LogoUpload from './LogoUpload';
+import api, { getAssetUrl } from '../utils/api';
 
 function InvoiceForm() {
   const [client, setClient] = useState('');
@@ -52,12 +52,11 @@ function InvoiceForm() {
     }
     try {
       const invoiceData = { client, companyInfo, items, total: calculateTotal() };
-      await axios.post('http://localhost:5000/api/invoice', invoiceData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/api/invoice', invoiceData);
       setMessage('Invoice saved successfully!');
     } catch (error) {
-      setMessage('Error saving invoice.');
+      console.error('Error saving invoice:', error);
+      setMessage('Error saving invoice. Please try again.');
     }
   };
 
@@ -70,7 +69,7 @@ function InvoiceForm() {
     if (logoPath) {
       try {
         // Add logo to PDF (adjust positioning as needed)
-        const logoUrl = `http://localhost:5000${logoPath}`;
+        const logoUrl = getAssetUrl(logoPath);
         
         // Create an image element to get dimensions
         const img = new Image();
@@ -101,317 +100,366 @@ function InvoiceForm() {
           doc.addImage(logoUrl, 'PNG', 14, 14, imgWidth, imgHeight);
           
           // Continue with the rest of the PDF generation
-          finalizePDF();
+          continueGeneratingPDF();
         };
         
-        // Handle image loading error
+        // In case image fails to load
         img.onerror = function() {
           console.error('Error loading logo image');
-          finalizePDF();
+          continueGeneratingPDF();
         };
       } catch (error) {
-        console.error('Error adding logo to PDF:', error);
-        finalizePDF();
+        console.error('Error with logo in PDF:', error);
+        continueGeneratingPDF();
       }
     } else {
-      finalizePDF();
+      continueGeneratingPDF();
     }
     
-    function finalizePDF() {
-      // Add company header
-      doc.setFontSize(20);
-      doc.setTextColor(44, 62, 80);
+    function continueGeneratingPDF() {
+      // Company info
+      doc.setFontSize(18);
+      doc.text(companyInfo.name, 14, startY + 35);
       
-      // If logo exists, position text to the right of the logo
-      if (logoPath) {
-        doc.text(companyInfo.name, 105, 25, { align: 'center' });
-        
-        doc.setFontSize(10);
-        doc.text(companyInfo.address, 105, 33, { align: 'center' });
-        doc.text(`Email: ${companyInfo.email} | Phone: ${companyInfo.phone}`, 105, 39, { align: 'center' });
-        
-        // Add horizontal line
-        doc.setDrawColor(44, 62, 80);
-        doc.line(14, 48, 196, 48);
-        
-        startY = 58; // Adjust starting Y position for the rest of the content
-      } else {
-        doc.text(companyInfo.name, 105, 20, { align: 'center' });
-        
-        doc.setFontSize(10);
-        doc.text(companyInfo.address, 105, 28, { align: 'center' });
-        doc.text(`Email: ${companyInfo.email} | Phone: ${companyInfo.phone}`, 105, 34, { align: 'center' });
-        
-        // Add horizontal line
-        doc.setDrawColor(44, 62, 80);
-        doc.line(14, 38, 196, 38);
-        
-        startY = 48; // Default starting Y position
-      }
+      doc.setFontSize(10);
+      doc.text(companyInfo.address, 14, startY + 45);
+      doc.text(`Email: ${companyInfo.email}`, 14, startY + 50);
+      doc.text(`Phone: ${companyInfo.phone}`, 14, startY + 55);
       
       // Invoice title
-      doc.setFontSize(18);
-      doc.text('INVOICE', 14, startY + 10);
+      doc.setFontSize(22);
+      doc.text('INVOICE', 140, startY + 20);
       
-      // Date and Invoice Number
+      // Date
       const today = new Date();
-      const invoiceNumber = `INV-${today.getFullYear()}${(today.getMonth() + 1).toString().padStart(2, '0')}${today.getDate().toString().padStart(2, '0')}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-      
       doc.setFontSize(10);
-      doc.text(`Date: ${today.toLocaleDateString()}`, 14, startY + 18);
-      doc.text(`Invoice #: ${invoiceNumber}`, 14, startY + 24);
+      doc.text(`Date: ${today.toLocaleDateString()}`, 140, startY + 30);
       
-      // Client information
+      // Client info
       doc.setFontSize(12);
-      doc.text('Bill To:', 14, startY + 34);
-      doc.setFontSize(11);
-      doc.text(client, 14, startY + 40);
+      doc.text('Bill To:', 14, startY + 70);
+      doc.setFontSize(10);
+      doc.text(client, 14, startY + 80);
+      
+      // Items table
+      startY = startY + 100;
       
       // Table header
-      let tableStartY = startY + 50;
       doc.setFillColor(240, 240, 240);
-      doc.rect(14, tableStartY, 182, 8, 'F');
-      doc.setTextColor(0, 0, 0);
+      doc.rect(14, startY, 182, 10, 'F');
       doc.setFontSize(10);
-      doc.text('Description', 16, tableStartY + 5);
-      doc.text('Quantity', 100, tableStartY + 5);
-      doc.text('Unit Price', 130, tableStartY + 5);
-      doc.text('Amount', 170, tableStartY + 5);
+      doc.text('Description', 16, startY + 7);
+      doc.text('Quantity', 100, startY + 7);
+      doc.text('Price', 130, startY + 7);
+      doc.text('Amount', 170, startY + 7);
       
-      tableStartY += 10;
+      startY += 15;
       
-      // Table content
+      // Table rows
       items.forEach((item, index) => {
-        doc.text(item.description, 16, tableStartY + 5);
-        doc.text(item.quantity.toString(), 100, tableStartY + 5);
-        doc.text(`$${item.price.toFixed(2)}`, 130, tableStartY + 5);
-        doc.text(`$${(item.quantity * item.price).toFixed(2)}`, 170, tableStartY + 5);
-        tableStartY += 10;
-        
-        // Add light gray line
-        if (index < items.length - 1) {
-          doc.setDrawColor(220, 220, 220);
-          doc.line(14, tableStartY, 196, tableStartY);
-        }
+        doc.text(item.description, 16, startY);
+        doc.text(item.quantity.toString(), 100, startY);
+        doc.text(`$${item.price.toFixed(2)}`, 130, startY);
+        doc.text(`$${(item.quantity * item.price).toFixed(2)}`, 170, startY);
+        startY += 10;
       });
       
       // Total
-      doc.setDrawColor(44, 62, 80);
-      doc.line(14, tableStartY + 2, 196, tableStartY + 2);
+      startY += 10;
+      doc.setFillColor(240, 240, 240);
+      doc.rect(130, startY, 66, 10, 'F');
       doc.setFontSize(12);
-      doc.setTextColor(44, 62, 80);
-      doc.text(`Total: $${total.toFixed(2)}`, 170, tableStartY + 10);
+      doc.text('Total:', 135, startY + 7);
+      doc.text(`$${total.toFixed(2)}`, 170, startY + 7);
       
       // Footer
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text('Thank you for your business!', 105, 270, { align: 'center' });
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.text('Thank you for your business!', 14, 280);
+      }
       
-      doc.save('invoice.pdf');
+      // Save the PDF
+      doc.save(`Invoice-${today.toLocaleDateString().replace(/\//g, '-')}.pdf`);
     }
   };
 
+  const handleLogoChange = (path) => {
+    setLogoPath(path);
+  };
+
   const handleSelectContact = (contact) => {
-    // Format the contact information for the client field
-    const formattedClient = `${contact.name}
-${contact.address || ''}
-${contact.phone ? `Phone: ${contact.phone}` : ''}
-${contact.email ? `Email: ${contact.email}` : ''}`.trim();
-    
-    setClient(formattedClient);
+    setClient(contact.name);
+    setShowContactModal(false);
   };
 
   return (
     <div className="container mt-4">
-      <div className="card shadow">
-        <div className="card-header bg-primary text-white">
-          <h2 className="mb-0">Create Professional Invoice</h2>
+      <h1 className="mb-4">Create Invoice</h1>
+      
+      {message && (
+        <div className={`alert ${message.includes('successfully') ? 'alert-success' : 'alert-danger'} mb-4`}>
+          {message}
         </div>
-        <div className="card-body">
-          {message && <div className="alert alert-info">{message}</div>}
-          
-          {!localStorage.getItem('token') && (
-            <div className="alert alert-warning mb-4">
-              <div className="d-flex align-items-center">
-                <i className="bi bi-info-circle-fill me-2 fs-4"></i>
-                <div>
-                  <strong>You're using InvoicePro as a guest</strong>
-                  <p className="mb-0">You can create and export invoices as PDF, but you need to <a href="/login">login</a> or <a href="/register">register</a> to save them to your account.</p>
-                </div>
-              </div>
+      )}
+      
+      <div className="row">
+        <div className="col-md-8">
+          <div className="card shadow-sm mb-4">
+            <div className="card-header bg-light">
+              <h5 className="mb-0">Company Information</h5>
             </div>
-          )}
-          
-          <div className="row mb-4">
-            <div className="col-md-6">
-              <h5>Your Company Information</h5>
-              
-              {/* Logo Upload Component */}
-              {localStorage.getItem('token') && (
-                <LogoUpload onLogoChange={(path) => setLogoPath(path)} />
-              )}
-              
-              <div className="form-group mb-2">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Company Name"
-                  value={companyInfo.name}
-                  onChange={(e) => setCompanyInfo({...companyInfo, name: e.target.value})}
-                />
-              </div>
-              <div className="form-group mb-2">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Company Address"
-                  value={companyInfo.address}
-                  onChange={(e) => setCompanyInfo({...companyInfo, address: e.target.value})}
-                />
-              </div>
+            <div className="card-body">
               <div className="row">
                 <div className="col-md-6">
-                  <div className="form-group mb-2">
+                  <div className="mb-3">
+                    <label className="form-label">Company Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={companyInfo.name}
+                      onChange={(e) => setCompanyInfo({...companyInfo, name: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="mb-3">
+                    <label className="form-label">Email</label>
                     <input
                       type="email"
                       className="form-control"
-                      placeholder="Email"
                       value={companyInfo.email}
                       onChange={(e) => setCompanyInfo({...companyInfo, email: e.target.value})}
                     />
                   </div>
                 </div>
+              </div>
+              <div className="row">
                 <div className="col-md-6">
-                  <div className="form-group mb-2">
+                  <div className="mb-3">
+                    <label className="form-label">Address</label>
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="Phone"
+                      value={companyInfo.address}
+                      onChange={(e) => setCompanyInfo({...companyInfo, address: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="mb-3">
+                    <label className="form-label">Phone</label>
+                    <input
+                      type="text"
+                      className="form-control"
                       value={companyInfo.phone}
                       onChange={(e) => setCompanyInfo({...companyInfo, phone: e.target.value})}
                     />
                   </div>
                 </div>
               </div>
+              <div className="row">
+                <div className="col-12">
+                  <LogoUpload onLogoChange={handleLogoChange} />
+                </div>
+              </div>
             </div>
-            
-            <div className="col-md-6">
-              <h5>Client Information</h5>
-              <div className="form-group mb-2">
-                <textarea
+          </div>
+          
+          <div className="card shadow-sm mb-4">
+            <div className="card-header bg-light d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">Client Information</h5>
+              <button 
+                className="btn btn-sm btn-outline-primary" 
+                onClick={() => setShowContactModal(true)}
+              >
+                Select from Address Book
+              </button>
+            </div>
+            <div className="card-body">
+              <div className="mb-3">
+                <label className="form-label">Client Name / Company</label>
+                <input
+                  type="text"
                   className="form-control"
-                  placeholder="Client name and address"
                   value={client}
                   onChange={(e) => setClient(e.target.value)}
-                  rows="5"
+                  placeholder="Enter client name or company"
                 />
               </div>
-              {localStorage.getItem('token') && (
-                <button 
-                  type="button" 
-                  className="btn btn-outline-primary btn-sm"
-                  onClick={() => setShowContactModal(true)}
-                >
-                  <i className="bi bi-person-rolodex me-1"></i> Select from Address Book
-                </button>
-              )}
             </div>
           </div>
           
-          <h5>Invoice Items</h5>
-          <div className="table-responsive">
-            <table className="table table-bordered">
-              <thead className="table-light">
-                <tr>
-                  <th>Description</th>
-                  <th>Quantity</th>
-                  <th>Price ($)</th>
-                  <th>Amount</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, index) => (
-                  <tr key={index}>
-                    <td>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Description"
-                        value={item.description}
-                        onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        className="form-control"
-                        placeholder="Quantity"
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                      />
-                    </td>
-                    <td>
+          <div className="card shadow-sm mb-4">
+            <div className="card-header bg-light">
+              <h5 className="mb-0">Invoice Items</h5>
+            </div>
+            <div className="card-body">
+              {items.map((item, index) => (
+                <div key={index} className="row mb-3 align-items-end">
+                  <div className="col-md-6">
+                    <label className="form-label">Description</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={item.description}
+                      onChange={(e) => handleItemChange(index, 'description', e.target.value)}
+                      placeholder="Item description"
+                    />
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label">Quantity</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                      min="1"
+                    />
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label">Price</label>
+                    <div className="input-group">
+                      <span className="input-group-text">$</span>
                       <input
                         type="number"
                         className="form-control"
-                        placeholder="Price"
                         value={item.price}
                         onChange={(e) => handleItemChange(index, 'price', e.target.value)}
+                        min="0"
+                        step="0.01"
                       />
-                    </td>
-                    <td>${(item.quantity * item.price).toFixed(2)}</td>
-                    <td>
-                      <button 
-                        className="btn btn-sm btn-danger"
-                        onClick={() => removeItem(index)}
-                        disabled={items.length === 1}
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan="5">
-                    <button className="btn btn-sm btn-success" onClick={addItem}>
-                      Add Item
+                    </div>
+                  </div>
+                  <div className="col-md-2 d-flex align-items-center">
+                    <button
+                      type="button"
+                      className="btn btn-outline-danger"
+                      onClick={() => removeItem(index)}
+                      disabled={items.length === 1}
+                    >
+                      <i className="bi bi-trash"></i>
                     </button>
-                  </td>
-                </tr>
-                <tr>
-                  <td colSpan="3" className="text-end"><strong>Total:</strong></td>
-                  <td colSpan="2"><strong>${total.toFixed(2)}</strong></td>
-                </tr>
-              </tfoot>
-            </table>
+                  </div>
+                </div>
+              ))}
+              
+              <button
+                type="button"
+                className="btn btn-outline-primary"
+                onClick={addItem}
+              >
+                <i className="bi bi-plus-circle me-1"></i> Add Item
+              </button>
+            </div>
+            <div className="card-footer bg-light">
+              <div className="row">
+                <div className="col-md-6 offset-md-6">
+                  <div className="d-flex justify-content-between">
+                    <h5>Total:</h5>
+                    <h5>${total.toFixed(2)}</h5>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           
-          <div className="d-flex justify-content-end mt-3">
-            <button 
-              className="btn btn-primary me-2" 
-              onClick={handleSaveInvoice}
-            >
-              Save Invoice
-            </button>
-            <button 
-              className="btn btn-success" 
+          <div className="d-flex justify-content-end mb-5">
+            <button
+              type="button"
+              className="btn btn-outline-secondary me-2"
               onClick={handleExportPDF}
             >
-              Export as PDF
+              <i className="bi bi-file-pdf me-1"></i> Export as PDF
             </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleSaveInvoice}
+            >
+              <i className="bi bi-save me-1"></i> Save Invoice
+            </button>
+          </div>
+        </div>
+        
+        <div className="col-md-4">
+          <div className="card shadow-sm">
+            <div className="card-header bg-light">
+              <h5 className="mb-0">Invoice Preview</h5>
+            </div>
+            <div className="card-body p-4">
+              <div className="invoice-preview">
+                {/* Company header */}
+                <div className="mb-4">
+                  <h4>{companyInfo.name}</h4>
+                  <div className="small text-muted">
+                    {companyInfo.address}<br />
+                    {companyInfo.email}<br />
+                    {companyInfo.phone}
+                  </div>
+                </div>
+                
+                {/* Invoice title */}
+                <div className="text-center mb-4">
+                  <h3 className="text-uppercase">Invoice</h3>
+                  <div className="text-muted">
+                    {new Date().toLocaleDateString()}
+                  </div>
+                </div>
+                
+                {/* Client info */}
+                <div className="mb-4">
+                  <strong>Bill To:</strong>
+                  <div>{client || 'Client Name'}</div>
+                </div>
+                
+                {/* Items table */}
+                <table className="table table-sm">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Description</th>
+                      <th className="text-end">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item, index) => (
+                      <tr key={index}>
+                        <td>
+                          {item.description || 'Item description'}<br />
+                          <small className="text-muted">
+                            {item.quantity} x ${item.price.toFixed(2)}
+                          </small>
+                        </td>
+                        <td className="text-end">${(item.quantity * item.price).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th>Total</th>
+                      <th className="text-end">${total.toFixed(2)}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+                
+                {/* Thank you note */}
+                <div className="text-center text-muted small mt-4">
+                  Thank you for your business!
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       
-      {/* Contact Selection Modal */}
-      <ContactSelectionModal 
-        show={showContactModal}
-        onClose={() => setShowContactModal(false)}
-        onSelectContact={handleSelectContact}
-      />
+      {/* Contact selection modal */}
+      {showContactModal && (
+        <ContactSelectionModal
+          onClose={() => setShowContactModal(false)}
+          onSelectContact={handleSelectContact}
+        />
+      )}
     </div>
   );
 }

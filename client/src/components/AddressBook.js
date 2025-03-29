@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import api from '../utils/api';
 
 function AddressBook({ onSelectContact = null, isModal = false }) {
   const [contacts, setContacts] = useState([]);
@@ -28,12 +28,11 @@ function AddressBook({ onSelectContact = null, isModal = false }) {
     }
 
     try {
-      const response = await axios.get('http://localhost:5000/api/address-book', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/api/address-book');
       setContacts(response.data);
       setLoading(false);
     } catch (err) {
+      console.error('Error fetching contacts:', err);
       setError('Failed to load contacts. Please try again later.');
       setLoading(false);
     }
@@ -51,17 +50,15 @@ function AddressBook({ onSelectContact = null, isModal = false }) {
 
     try {
       if (formMode === 'add') {
-        const response = await axios.post(
-          'http://localhost:5000/api/address-book',
-          currentContact,
-          { headers: { Authorization: `Bearer ${token}` } }
+        const response = await api.post(
+          '/api/address-book',
+          currentContact
         );
         setContacts([...contacts, response.data]);
       } else {
-        const response = await axios.put(
-          `http://localhost:5000/api/address-book/${currentContact.id}`,
-          currentContact,
-          { headers: { Authorization: `Bearer ${token}` } }
+        const response = await api.put(
+          `/api/address-book/${currentContact.id}`,
+          currentContact
         );
         setContacts(
           contacts.map(contact => 
@@ -71,6 +68,7 @@ function AddressBook({ onSelectContact = null, isModal = false }) {
       }
       resetForm();
     } catch (err) {
+      console.error('Error saving contact:', err);
       setError('Failed to save contact. Please try again.');
     }
   };
@@ -88,11 +86,10 @@ function AddressBook({ onSelectContact = null, isModal = false }) {
     if (!token) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/address-book/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/api/address-book/${id}`);
       setContacts(contacts.filter(contact => contact.id !== id));
     } catch (err) {
+      console.error('Error deleting contact:', err);
       setError('Failed to delete contact. Please try again.');
     }
   };

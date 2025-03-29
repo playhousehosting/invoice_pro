@@ -11,11 +11,13 @@ function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/auth/register', { username, password });
+      // Use relative URL for API calls to work in both development and production
+      await axios.post('/api/auth/register', { username, password });
       setMessage('Registration successful. Please log in.');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
-      setMessage(err.response?.data?.message || 'Registration failed');
+      console.error('Registration error:', err);
+      setMessage(err.response?.data?.message || 'Registration failed. Please check your connection and try again.');
     }
   };
 
