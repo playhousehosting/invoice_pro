@@ -12,6 +12,7 @@ const addressBookRoutes = require('./routes/addressBook');
 const adminRoutes = require('./routes/admin');
 const uploadRoutes = require('./routes/upload');
 const templateRoutes = require('./routes/template');
+const catalogRoutes = require('./routes/catalog');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -46,6 +47,7 @@ app.use('/api/address-book', authenticateToken, addressBookRoutes);
 app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
 app.use('/api/templates', authenticateToken, templateRoutes);
+app.use('/api/catalog', authenticateToken, catalogRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

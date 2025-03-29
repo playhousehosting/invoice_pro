@@ -8,7 +8,7 @@ datasource db {
 }
 
 model User {
-  id            String      @id
+  id            String      @id @default(cuid())
   name          String?
   email         String      @unique
   emailVerified DateTime?
@@ -20,6 +20,7 @@ model User {
   preferences   Json?
   Business      Business[]
   SavedList     SavedList[]
+  integrations  UserIntegrations?
 }
 
 model BlogPost {
@@ -137,8 +138,45 @@ model users {
   email         String?     @unique(map: "ix_users_email") @db.VarChar
   created_at    DateTime?   @default(now()) @db.Timestamptz(6)
   favorites     favorites[]
+}
 
-  @@index([id], map: "ix_users_id")
+model UserIntegrations {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  
+  // CRM Integrations
+  salesforce_enabled      Boolean @default(false)
+  salesforce_config      Json?
+  hubspot_enabled        Boolean @default(false)
+  hubspot_config        Json?
+  zoho_enabled          Boolean @default(false)
+  zoho_config          Json?
+
+  // Storage Integrations
+  google_drive_enabled   Boolean @default(false)
+  google_drive_config   Json?
+  dropbox_enabled       Boolean @default(false)
+  dropbox_config       Json?
+  onedrive_enabled      Boolean @default(false)
+  onedrive_config      Json?
+
+  // Document Services
+  docusign_enabled      Boolean @default(false)
+  docusign_config      Json?
+
+  // Email Services
+  sendgrid_enabled      Boolean @default(false)
+  sendgrid_config      Json?
+  mailgun_enabled       Boolean @default(false)
+  mailgun_config       Json?
+
+  // SMS Services
+  twilio_enabled        Boolean @default(false)
+  twilio_config        Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum UserRole {

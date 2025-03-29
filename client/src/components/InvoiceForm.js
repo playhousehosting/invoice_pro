@@ -21,6 +21,8 @@ function InvoiceForm() {
   const [imagePath, setImagePath] = useState('');
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [catalog, setCatalog] = useState([]);
+  const [showCatalogModal, setShowCatalogModal] = useState(false);
 
   const calculateTotal = () => {
     const totalAmount = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
@@ -209,18 +211,31 @@ function InvoiceForm() {
     }
   };
 
+  const addCatalogItem = (item) => {
+    setItems([...items, {
+      description: item.name,
+      quantity: 1,
+      price: item.rate
+    }]);
+    setShowCatalogModal(false);
+  };
+
   useEffect(() => {
-    // Load templates
-    const fetchTemplates = async () => {
+    // Load templates and catalog
+    const fetchData = async () => {
       try {
-        const response = await api.get('/api/templates');
-        setTemplates(response.data);
+        const [templatesRes, catalogRes] = await Promise.all([
+          api.get('/api/templates'),
+          api.get('/api/catalog')
+        ]);
+        setTemplates(templatesRes.data);
+        setCatalog(catalogRes.data);
       } catch (error) {
-        console.error('Error fetching templates:', error);
+        console.error('Error fetching data:', error);
       }
     };
 
-    fetchTemplates();
+    fetchData();
   }, []);
 
   return (
@@ -401,6 +416,13 @@ function InvoiceForm() {
               >
                 <i className="bi bi-plus-circle me-1"></i> Add Item
               </button>
+              <button
+                type="button"
+                className="btn btn-secondary mb-3"
+                onClick={() => setShowCatalogModal(true)}
+              >
+                Add from Catalog
+              </button>
             </div>
             <div className="card-footer bg-light">
               <div className="row">
@@ -509,6 +531,44 @@ function InvoiceForm() {
           onSelectContact={handleSelectContact}
         />
       )}
+      
+      {/* Catalog modal */}
+      <div className={`modal ${showCatalogModal ? 'show' : ''}`} style={{ display: showCatalogModal ? 'block' : 'none' }}>
+        <div className="modal-dialog modal-lg">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">Add from Catalog</h5>
+              <button type="button" className="btn-close" onClick={() => setShowCatalogModal(false)}></button>
+            </div>
+            <div className="modal-body">
+              <div className="row">
+                {catalog.map(item => (
+                  <div key={item.id} className="col-md-6 mb-3">
+                    <div className="card">
+                      <div className="card-body">
+                        <h5 className="card-title">{item.name}</h5>
+                        <p className="card-text">{item.description}</p>
+                        <p className="card-text">
+                          <small className="text-muted">
+                            Type: {item.type} | Rate: ${item.rate}
+                          </small>
+                        </p>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => addCatalogItem(item)}
+                        >
+                          Add to Invoice
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="modal-backdrop fade show" style={{ display: showCatalogModal ? 'block' : 'none' }}></div>
     </div>
   );
 }
