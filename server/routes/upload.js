@@ -11,22 +11,35 @@ const router = express.Router();
 // JWT Secret from environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
 
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// Check if we're in production (Vercel) or development environment
+const isProduction = process.env.VERCEL === '1';
 
-// Configure multer storage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueFilename = `${uuidv4()}${path.extname(file.originalname)}`;
-    cb(null, uniqueFilename);
+// Storage configuration based on environment
+let storage;
+let uploadsDir;
+
+if (isProduction) {
+  // In production (Vercel), use memory storage
+  storage = multer.memoryStorage();
+} else {
+  // In development, use disk storage
+  uploadsDir = path.join(__dirname, '../uploads');
+  
+  // Create uploads directory if it doesn't exist (only in development)
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
   }
-});
+  
+  storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, uploadsDir);
+    },
+    filename: function (req, file, cb) {
+      const uniqueFilename = `${uuidv4()}${path.extname(file.originalname)}`;
+      cb(null, uniqueFilename);
+    }
+  });
+}
 
 // File filter to only allow image files
 const fileFilter = (req, file, cb) => {
@@ -72,8 +85,17 @@ router.post('/logo', authenticateToken, upload.single('logo'), async (req, res) 
       return res.status(400).json({ message: 'No file uploaded.' });
     }
     
-    // Get relative path to the file
-    const logoPath = `/uploads/${req.file.filename}`;
+    let logoPath;
+    
+    if (isProduction) {
+      // In production, we can't save files to disk
+      // Instead, we'll save a placeholder and in a real app
+      // you would use a cloud storage service like S3
+      logoPath = `/placeholder-${uuidv4()}.png`;
+    } else {
+      // In development, use the file path on disk
+      logoPath = `/uploads/${req.file.filename}`;
+    }
     
     // Update user with logo path
     await prisma.user.update({
@@ -134,12 +156,15 @@ router.delete('/logo', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'No logo found.' });
     }
     
-    // Get the file path
-    const filePath = path.join(__dirname, '..', user.logoPath);
-    
-    // Delete the file if it exists
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    // Only attempt to delete the file in development environment
+    if (!isProduction && user.logoPath.startsWith('/uploads/')) {
+      // Get the file path
+      const filePath = path.join(__dirname, '..', user.logoPath);
+      
+      // Delete the file if it exists
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
     }
     
     // Update user to remove logo path
