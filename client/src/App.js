@@ -23,11 +23,12 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/create" element={<InvoiceForm />} />
+        <Route path="/create" element={<PrivateRoute><InvoiceForm /></PrivateRoute>} />
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/address-book" element={<PrivateRoute><AddressBook /></PrivateRoute>} />
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/setup-admin" element={<SetupAdmin />} />
+        <Route path="/admin" element={<PrivateRoute><AdminDashboard /></PrivateRoute>} />
+        <Route path="/setup-admin" element={<PrivateRoute><SetupAdmin /></PrivateRoute>} />
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </>
   );
