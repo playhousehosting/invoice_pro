@@ -5,8 +5,17 @@ const { v4: uuidv4 } = require('uuid');
 const prisma = require('../prisma/client');
 const router = express.Router();
 
-// JWT Secret from environment variables
-const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
+// Environment configuration with defaults
+const config = {
+  jwtSecret: process.env.JWT_SECRET || 'default_development_secret',
+  jwtExpiration: process.env.JWT_EXPIRATION || '24h',
+  nodeEnv: process.env.NODE_ENV || 'development'
+};
+
+// Warn if using default secret in production
+if (config.nodeEnv === 'production' && !process.env.JWT_SECRET) {
+  console.warn('Warning: Using default JWT secret in production. This is not recommended.');
+}
 
 // Register endpoint
 router.post('/register', async (req, res) => {
@@ -55,7 +64,7 @@ router.post('/register', async (req, res) => {
     console.error('Registration error:', error);
     res.status(500).json({ 
       message: 'Failed to register.',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: config.nodeEnv === 'development' ? error.message : undefined
     });
   }
 });
@@ -108,7 +117,7 @@ router.post('/setup-admin', async (req, res) => {
     console.error('Setup admin error:', error);
     res.status(500).json({
       message: 'Failed to setup admin.',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: config.nodeEnv === 'development' ? error.message : undefined
     });
   }
 });
@@ -118,53 +127,41 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate input
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    // Find user
     const user = await prisma.user.findUnique({
       where: { email }
     });
 
     if (!user) {
-      return res.status(401).json({ message: 'Invalid email or password.' });
+      return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    // Verify password
     const validPassword = await bcrypt.compare(password, user.password);
-
     if (!validPassword) {
-      return res.status(401).json({ message: 'Invalid email or password.' });
+      return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    // Create JWT token
     const token = jwt.sign(
-      { 
-        id: user.id,
-        email: user.email,
-        role: user.role
-      },
-      JWT_SECRET,
-      { expiresIn: '24h' }
+      { id: user.id, email: user.email, role: user.role },
+      config.jwtSecret,
+      { expiresIn: config.jwtExpiration }
     );
 
-    res.json({ 
+    res.json({
       token,
       user: {
         id: user.id,
-        name: user.name,
         email: user.email,
+        name: user.name,
         role: user.role
       }
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ 
-      message: 'Failed to login.',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.status(500).json({ message: 'Error during login.' });
   }
 });
 
@@ -193,7 +190,7 @@ router.get('/me', async (req, res) => {
     console.error('Get user error:', error);
     res.status(500).json({ 
       message: 'Failed to get user information.',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: config.nodeEnv === 'development' ? error.message : undefined
     });
   }
 });

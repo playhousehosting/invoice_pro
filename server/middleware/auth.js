@@ -1,7 +1,11 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../prisma/client');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
+// Use a default secret for development, but warn if it's used in production
+const JWT_SECRET = process.env.JWT_SECRET || 'default_development_secret';
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.warn('Warning: Using default JWT secret in production. This is not recommended.');
+}
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
