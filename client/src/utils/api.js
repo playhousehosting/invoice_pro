@@ -1,13 +1,22 @@
 import axios from 'axios';
 
+// Get the base URL based on environment
+const getBaseUrl = () => {
+  if (process.env.NODE_ENV === 'production') {
+    // In production (Vercel), use relative path
+    return '/api';
+  }
+  // In development, use localhost
+  return 'http://localhost:5000/api';
+};
+
 // Create an axios instance with base configuration
 const api = axios.create({
-  baseURL: process.env.NODE_ENV === 'production' 
-    ? '/api' // Use /api prefix in production
-    : 'http://localhost:5000', // Use localhost in development
+  baseURL: getBaseUrl(),
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  withCredentials: true // Important for Vercel JWT cookie
 });
 
 // Add a request interceptor to include auth token
@@ -28,35 +37,25 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response) {
-      // Handle 401 Unauthorized errors
-      if (error.response.status === 401) {
-        localStorage.removeItem('token');
+    // Handle token expiration
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
-      // Return the error response for other error codes
-      return Promise.reject(error.response.data);
     }
     return Promise.reject(error);
   }
 );
 
-export default api;
-
 // Helper function to get full URL for assets (like images)
-export const getAssetUrl = (path) => {
-  if (!path) return '';
-  
-  // If path already includes http/https, return as is
+const getAssetUrl = (path) => {
+  const baseUrl = getBaseUrl();
   if (path.startsWith('http')) {
     return path;
   }
-  
-  // In production, use /api prefix
-  if (process.env.NODE_ENV === 'production') {
-    return `/api${path}`;
-  }
-  
-  // In development, prepend localhost
-  return `http://localhost:5000${path}`;
+  return `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
 };
+
+export { getAssetUrl };
+export default api;

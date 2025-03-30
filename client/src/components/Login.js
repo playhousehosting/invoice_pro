@@ -19,7 +19,7 @@ function Login() {
         throw new Error('Please enter both email and password.');
       }
 
-      const res = await api.post('/api/auth/login', {
+      const res = await api.post('/auth/login', {
         email,
         password
       });
