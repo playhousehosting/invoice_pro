@@ -3,23 +3,11 @@
   "functions": {
     "server/server.js": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 10,
+      "runtime": "@vercel/node@latest"
     }
   },
-  "builds": [
-    {
-      "src": "server/server.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "client/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "buildCommand": "cd client && npm install && npm run build",
-        "outputDirectory": "client/build"
-      }
-    }
-  ],
+  "outputDirectory": "client/build",
   "routes": [
     {
       "src": "/api/(.*)",
