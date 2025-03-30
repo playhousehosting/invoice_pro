@@ -17,6 +17,15 @@ const catalogRoutes = require('./routes/catalog');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Global error handler:', err);
+  res.status(500).json({
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
@@ -30,13 +39,36 @@ if (!isVercel) {
   app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 }
 
-// Health check route
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Invoice API Server is running',
-    environment: isVercel ? 'production (Vercel)' : 'development',
-    timestamp: new Date().toISOString()
-  });
+// Test database connection
+async function testDbConnection() {
+  try {
+    await prisma.$connect();
+    console.log('Successfully connected to the database');
+  } catch (error) {
+    console.error('Database connection error:', error);
+    throw error;
+  }
+}
+
+// Health check route with DB connection status
+app.get('/', async (req, res) => {
+  try {
+    await testDbConnection();
+    res.json({ 
+      message: 'Invoice API Server is running',
+      environment: isVercel ? 'production (Vercel)' : 'development',
+      timestamp: new Date().toISOString(),
+      database: 'connected'
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Server is running but database connection failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Database connection error',
+      environment: isVercel ? 'production (Vercel)' : 'development',
+      timestamp: new Date().toISOString(),
+      database: 'disconnected'
+    });
+  }
 });
 
 // API routes
@@ -49,29 +81,37 @@ app.use('/api/upload', authenticateToken, uploadRoutes);
 app.use('/api/templates', authenticateToken, templateRoutes);
 app.use('/api/catalog', authenticateToken, catalogRoutes);
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server error:', err.stack);
-  res.status(500).json({ 
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
+// Error handling for unhandled routes
+app.use((req, res) => {
+  res.status(404).json({ message: 'Route not found' });
 });
 
-// Only start the server if not in Vercel (in Vercel, we export the app)
+// Connect to database before starting server
 if (!isVercel) {
-  const server = app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
-  
-  // Handle graceful shutdown
-  process.on('SIGTERM', async () => {
-    console.log('SIGTERM received, shutting down gracefully');
-    await prisma.$disconnect();
-    server.close(() => {
-      console.log('Process terminated');
+  testDbConnection()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+      });
+    })
+    .catch((error) => {
+      console.error('Failed to start server:', error);
+      process.exit(1);
     });
-  });
 }
 
+// Cleanup on server shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received. Cleaning up...');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received. Cleaning up...');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+// Export the Express app for Vercel
 module.exports = app;
