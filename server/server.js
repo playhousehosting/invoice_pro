@@ -18,52 +18,81 @@ const integrationsRoutes = require('./routes/integrations');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Determine if we're in Vercel's serverless environment
+const isVercel = process.env.VERCEL === '1';
+
+// Configure CORS
+app.use(cors({
+  origin: isVercel ? true : 'http://localhost:3000',
+  credentials: true
+}));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log('Headers:', req.headers);
+  next();
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Global error handler:', err);
+  const timestamp = new Date().toISOString();
+  console.error(`[${timestamp}] Error:`, {
+    message: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method,
+    headers: req.headers
+  });
+  
   res.status(500).json({
     error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    timestamp
   });
 });
 
-// Middleware
-app.use(cors());
+// Body parsing middleware
 app.use(bodyParser.json());
-
-// Determine if we're in Vercel's serverless environment
-const isVercel = process.env.VERCEL === '1';
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Test database connection
 async function testDbConnection() {
   try {
     await prisma.$connect();
-    console.log('Successfully connected to the database');
+    console.log('[Database] Successfully connected to the database');
+    return true;
   } catch (error) {
-    console.error('Database connection error:', error);
-    throw error;
+    console.error('[Database] Connection error:', {
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+    return false;
   }
 }
 
 // Health check route with DB connection status
 app.get('/api/health', async (req, res) => {
-  try {
-    await testDbConnection();
-    res.json({ 
-      message: 'Invoice API Server is running',
-      environment: isVercel ? 'production (Vercel)' : 'development',
-      timestamp: new Date().toISOString(),
-      database: 'connected'
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Server is running but database connection failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Database connection error',
-      environment: isVercel ? 'production (Vercel)' : 'development',
-      timestamp: new Date().toISOString(),
-      database: 'disconnected'
-    });
+  console.log('[Health Check] Received request');
+  const dbConnected = await testDbConnection();
+  
+  const response = {
+    message: 'Invoice API Server is running',
+    environment: isVercel ? 'production (Vercel)' : 'development',
+    timestamp: new Date().toISOString(),
+    database: dbConnected ? 'connected' : 'disconnected',
+    node_env: process.env.NODE_ENV,
+    vercel: isVercel
+  };
+  
+  console.log('[Health Check] Response:', response);
+  
+  if (!dbConnected) {
+    return res.status(503).json(response);
   }
+  
+  res.json(response);
 });
 
 // API routes
@@ -84,36 +113,44 @@ if (!isVercel) {
   });
 }
 
-// Error handling for unhandled routes
-app.use((req, res) => {
-  if (req.path.startsWith('/api/')) {
-    res.status(404).json({ message: 'API route not found' });
-  }
+// API 404 handler
+app.use('/api/*', (req, res) => {
+  console.log(`[404] API route not found: ${req.method} ${req.url}`);
+  res.status(404).json({ 
+    message: 'API route not found',
+    path: req.path,
+    method: req.method,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Connect to database before starting server
 if (!isVercel) {
   testDbConnection()
-    .then(() => {
+    .then((connected) => {
+      if (!connected) {
+        console.error('[Startup] Failed to connect to database');
+        process.exit(1);
+      }
       app.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`);
+        console.log(`[Server] Running on port ${PORT}`);
       });
     })
     .catch((error) => {
-      console.error('Failed to start server:', error);
+      console.error('[Startup] Failed to start server:', error);
       process.exit(1);
     });
 }
 
 // Cleanup on server shutdown
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received. Cleaning up...');
+  console.log('[Shutdown] SIGTERM received. Cleaning up...');
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('SIGINT received. Cleaning up...');
+  console.log('[Shutdown] SIGINT received. Cleaning up...');
   await prisma.$disconnect();
   process.exit(0);
 });
