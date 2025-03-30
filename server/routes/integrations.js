@@ -3,130 +3,73 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const integrationManager = require('../services/integrationManager');
 
-// Get all available integrations
-router.get('/available', authenticateToken, async (req, res) => {
+// Get available integrations
+router.get('/available', authenticateToken, (req, res) => {
   try {
-    const availableIntegrations = await integrationManager.getAvailableIntegrations();
-    res.json(availableIntegrations);
+    const availableIntegrations = Object.keys(integrationManager.services);
+    res.json({ integrations: availableIntegrations });
   } catch (error) {
-    console.error('Get available integrations error:', error);
-    res.status(500).json({ error: 'Failed to get available integrations' });
+    console.error('Error getting available integrations:', error);
+    res.status(500).json({ message: 'Failed to get available integrations' });
   }
 });
 
-// Get user's enabled integrations
-router.get('/user', authenticateToken, async (req, res) => {
+// Get user's integrations
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const userIntegrations = await integrationManager.getUserIntegrations(req.user.id);
-    res.json(userIntegrations);
+    const integrations = await integrationManager.getUserIntegrations(req.user.id);
+    res.json({ integrations });
   } catch (error) {
-    console.error('Get user integrations error:', error);
-    res.status(500).json({ error: 'Failed to get user integrations' });
+    console.error('Error getting user integrations:', error);
+    res.status(500).json({ message: 'Failed to get user integrations' });
   }
 });
 
-// Enable/disable an integration
-router.post('/:integration/toggle', authenticateToken, async (req, res) => {
-  try {
-    const { integration } = req.params;
-    const { enabled, config } = req.body;
+// Connect integration
+router.post('/connect/:type', authenticateToken, async (req, res) => {
+  const { type } = req.params;
+  const credentials = req.body;
 
-    if (enabled && config) {
-      const isValid = await integrationManager.validateIntegrationConfig(integration, config);
-      if (!isValid) {
-        return res.status(400).json({ error: 'Invalid integration configuration' });
-      }
+  try {
+    if (!integrationManager.services[type]) {
+      return res.status(400).json({ 
+        message: `Integration '${type}' is not available or not properly configured` 
+      });
     }
 
-    const updated = await integrationManager.updateIntegration(
+    const integration = await integrationManager.connectIntegration(
       req.user.id,
-      integration,
-      enabled,
-      config
+      type,
+      credentials
     );
-
-    res.json(updated);
+    res.json({ integration });
   } catch (error) {
-    console.error('Toggle integration error:', error);
-    res.status(500).json({ error: 'Failed to toggle integration' });
-  }
-});
-
-// Update integration configuration
-router.put('/:integration/config', authenticateToken, async (req, res) => {
-  try {
-    const { integration } = req.params;
-    const { config } = req.body;
-
-    const isValid = await integrationManager.validateIntegrationConfig(integration, config);
-    if (!isValid) {
-      return res.status(400).json({ error: 'Invalid integration configuration' });
-    }
-
-    const updated = await integrationManager.updateIntegration(
-      req.user.id,
-      integration,
-      true, // Enable the integration when updating config
-      config
-    );
-
-    res.json(updated);
-  } catch (error) {
-    console.error('Update integration config error:', error);
-    res.status(500).json({ error: 'Failed to update integration configuration' });
-  }
-});
-
-// Test integration connection
-router.post('/:integration/test', authenticateToken, async (req, res) => {
-  try {
-    const { integration } = req.params;
-    const { config } = req.body;
-
-    // First validate the configuration
-    const isValid = await integrationManager.validateIntegrationConfig(integration, config);
-    if (!isValid) {
-      return res.status(400).json({ error: 'Invalid integration configuration' });
-    }
-
-    // Try to execute a simple action to test the connection
-    await integrationManager.executeIntegrationAction(
-      req.user.id,
-      integration,
-      'test',
-      config
-    );
-
-    res.json({ success: true, message: 'Integration test successful' });
-  } catch (error) {
-    console.error('Test integration error:', error);
-    res.status(400).json({
-      success: false,
-      error: 'Integration test failed',
-      details: error.message
+    console.error(`Error connecting ${type} integration:`, error);
+    res.status(500).json({ 
+      message: `Failed to connect ${type} integration`,
+      error: error.message 
     });
   }
 });
 
-// Execute integration action
-router.post('/:integration/action/:action', authenticateToken, async (req, res) => {
+// Disconnect integration
+router.delete('/:type', authenticateToken, async (req, res) => {
+  const { type } = req.params;
+
   try {
-    const { integration, action } = req.params;
-    const { params } = req.body;
+    if (!integrationManager.services[type]) {
+      return res.status(400).json({ 
+        message: `Integration '${type}' is not available or not properly configured` 
+      });
+    }
 
-    const result = await integrationManager.executeIntegrationAction(
-      req.user.id,
-      integration,
-      action,
-      ...params
-    );
-
-    res.json(result);
+    await integrationManager.disconnectIntegration(req.user.id, type);
+    res.json({ message: `Successfully disconnected ${type} integration` });
   } catch (error) {
-    console.error('Execute integration action error:', error);
-    res.status(500).json({
-      error: 'Failed to execute integration action',
-      details: error.message
+    console.error(`Error disconnecting ${type} integration:`, error);
+    res.status(500).json({ 
+      message: `Failed to disconnect ${type} integration`,
+      error: error.message 
     });
   }
 });
