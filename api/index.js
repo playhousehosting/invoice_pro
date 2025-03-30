@@ -1,9 +1,16 @@
 // Special entry point for Vercel serverless deployment
 require('dotenv').config();
-const app = require('./server');
+const express = require('express');
+const app = express();
 
 // Log when the serverless function is initialized
 console.log('[Vercel] Serverless function initialized');
+
+// Import the server app
+const serverApp = require('../server/server');
+
+// Use the server app as middleware
+app.use(serverApp);
 
 // Add a catch-all route for debugging
 app.all('*', (req, res) => {
