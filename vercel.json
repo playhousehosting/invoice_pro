@@ -5,7 +5,7 @@
       "src": "server/server.js",
       "use": "@vercel/node@2.15.10",
       "config": {
-        "nodeVersion": "18.x"
+        "nodeVersion": "22.x"
       }
     },
     {
@@ -14,7 +14,7 @@
       "config": {
         "buildCommand": "cd client && npm install && npm run build",
         "outputDirectory": "client/build",
-        "nodeVersion": "18.x"
+        "nodeVersion": "22.x"
       }
     }
   ],
