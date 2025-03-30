@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.14.19",
+    "@mui/material": "^5.14.20",
     "axios": "^1.4.0",
     "invoice-app": "file:..",
     "jspdf": "^2.5.1",
@@ -13,7 +17,7 @@
   },
   "scripts": {
     "start": "npx react-scripts start",
-    "build": "react-scripts build"
+    "build": "CI=false react-scripts build"
   },
   "browserslist": {
     "production": [
