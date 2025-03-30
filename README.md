@@ -9,6 +9,9 @@ A full-stack application for creating, managing, and exporting professional invo
 - **Address Book**: Save and manage client information for quick access
 - **PDF Export**: Generate and download professional PDF invoices
 - **Dashboard**: View and manage all your saved invoices
+- **Integrations**: Connect with popular CRM, storage, and communication services
+- **Templates**: Create and manage invoice templates
+- **Catalog**: Manage product and service catalog
 - **Responsive Design**: Works on desktop and mobile devices
 
 ## Tech Stack
@@ -16,9 +19,10 @@ A full-stack application for creating, managing, and exporting professional invo
 ### Frontend
 - React
 - React Router
+- Material-UI (MUI) for components
 - Axios for API requests
 - jsPDF for PDF generation
-- Bootstrap 5 for UI components
+- Bootstrap 5 for base styling
 
 ### Backend
 - Node.js with Express
@@ -26,6 +30,17 @@ A full-stack application for creating, managing, and exporting professional invo
 - PostgreSQL (Neon Database)
 - JWT for authentication
 - bcrypt for password hashing
+
+### Integrations Support
+- CRM Systems: Salesforce, HubSpot, Zoho
+- Storage: Google Drive, Dropbox, OneDrive
+- Document Services: DocuSign
+- Communication: Email, SMS
+- Accounting: QuickBooks, FreshBooks, Xero
+- Analytics: Google Analytics
+- Payment: Stripe, PayPal
+- Time Tracking: Harvest, Toggl
+- Tax: Avalara
 
 ## Deployment
 
@@ -46,8 +61,14 @@ This application is configured for deployment on Vercel with a Neon PostgreSQL d
    ```
 
 2. Install dependencies:
-   ```
-   npm run install:all
+   ```bash
+   # Install server dependencies
+   cd server
+   npm install
+
+   # Install client dependencies
+   cd ../client
+   npm install
    ```
 
 3. Set up your environment variables:
@@ -55,14 +76,18 @@ This application is configured for deployment on Vercel with a Neon PostgreSQL d
    - Update the database connection string and JWT secret
 
 4. Run Prisma migrations:
-   ```
-   cd server
+   ```bash
+   cd ../server
    npx prisma migrate dev
    ```
 
-5. Start the development server:
-   ```
-   cd ..
+5. Start the development servers:
+   ```bash
+   # Start the backend server (from server directory)
+   npm start
+
+   # In a new terminal, start the frontend (from client directory)
+   cd ../client
    npm start
    ```
 
@@ -74,47 +99,66 @@ This application is configured for deployment on Vercel with a Neon PostgreSQL d
    - Go to [Vercel](https://vercel.com)
    - Click "New Project"
    - Import your GitHub repository
-   - Configure the project settings:
-     - Build Command: `npm run vercel-build`
-     - Output Directory: `client/build`
 
-3. Add environment variables:
+3. The project includes a `vercel.json` configuration file that handles:
+   - Backend API deployment
+   - Frontend static file building and serving
+   - Prisma client generation
+   - Environment configuration
+
+4. Add environment variables in Vercel:
    - `DATABASE_URL`: Your Neon PostgreSQL connection string
    - `JWT_SECRET`: A secure random string for JWT signing
-
-4. Deploy!
+   - `VERCEL`: Set to "1"
+   - `NODE_ENV`: Set to "production"
 
 ## Database Schema
 
-The application uses the following database schema:
-
 ### User
-- `id`: Integer (Primary Key)
-- `username`: String (Unique)
+- `id`: String (Primary Key, CUID)
+- `name`: String (Optional)
+- `email`: String (Unique)
+- `emailVerified`: DateTime (Optional)
 - `password`: String (Hashed)
+- `image`: String (Optional)
+- `role`: Enum (USER, ADMIN)
 - `createdAt`: DateTime
 - `updatedAt`: DateTime
+- `preferences`: Json (Optional)
 
-### Invoice
-- `id`: Integer (Primary Key)
-- `userId`: Integer (Foreign Key)
-- `client`: String
-- `companyInfo`: JSON
-- `items`: JSON
-- `total`: Float
-- `createdAt`: DateTime
-- `updatedAt`: DateTime
+### UserIntegrations
+- `id`: String (Primary Key, CUID)
+- `userId`: String (Foreign Key)
+- Various integration flags and configurations for:
+  - CRM systems (Salesforce, HubSpot, Zoho)
+  - Storage services (Google Drive, Dropbox, OneDrive)
+  - Document services (DocuSign)
+  - Communication services (Email, SMS)
 
-### Contact
-- `id`: Integer (Primary Key)
-- `userId`: Integer (Foreign Key)
+### Business
+- `id`: String (Primary Key)
 - `name`: String
-- `email`: String (Optional)
-- `address`: String (Optional)
+- `description`: String (Optional)
+- `address`: String
+- `city`: String
+- `province`: String
+- `postalCode`: String
 - `phone`: String (Optional)
-- `createdAt`: DateTime
-- `updatedAt`: DateTime
+- `email`: String (Optional)
+- `website`: String (Optional)
+- `businessType`: String[]
+- `canadianOwned`: Boolean
+- `verified`: Boolean
+- `featured`: Boolean
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.

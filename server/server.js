@@ -34,12 +34,6 @@ app.use(bodyParser.json());
 // Determine if we're in Vercel's serverless environment
 const isVercel = process.env.VERCEL === '1';
 
-// Only set up static file serving in development (not needed in Vercel)
-if (!isVercel) {
-  // Serve static files from the uploads directory
-  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-}
-
 // Test database connection
 async function testDbConnection() {
   try {
@@ -52,7 +46,7 @@ async function testDbConnection() {
 }
 
 // Health check route with DB connection status
-app.get('/', async (req, res) => {
+app.get('/api/health', async (req, res) => {
   try {
     await testDbConnection();
     res.json({ 
@@ -74,7 +68,6 @@ app.get('/', async (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
-// Protected routes - require authentication
 app.use('/api/invoice', authenticateToken, invoiceRoutes);
 app.use('/api/address-book', authenticateToken, addressBookRoutes);
 app.use('/api/admin', authenticateToken, adminRoutes);
@@ -83,9 +76,19 @@ app.use('/api/templates', authenticateToken, templateRoutes);
 app.use('/api/catalog', authenticateToken, catalogRoutes);
 app.use('/api/integrations', authenticateToken, integrationsRoutes);
 
+// Serve static files in development
+if (!isVercel) {
+  app.use(express.static(path.join(__dirname, '../client/build')));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build/index.html'));
+  });
+}
+
 // Error handling for unhandled routes
 app.use((req, res) => {
-  res.status(404).json({ message: 'Route not found' });
+  if (req.path.startsWith('/api/')) {
+    res.status(404).json({ message: 'API route not found' });
+  }
 });
 
 // Connect to database before starting server
