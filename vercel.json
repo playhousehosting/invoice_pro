@@ -6,7 +6,7 @@
       "use": "@vercel/node",
       "config": {
         "includeFiles": ["server/prisma/**/*"],
-        "buildCommand": "cd server && npx prisma generate"
+        "buildCommand": "npm install && npx prisma generate"
       }
     },
     {
