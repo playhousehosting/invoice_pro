@@ -1,8 +1,14 @@
 {
   "version": 2,
+  "functions": {
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
   "builds": [
     {
-      "src": "server/vercel-server.js",
+      "src": "api/index.js",
       "use": "@vercel/node"
     },
     {
@@ -17,7 +23,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "server/vercel-server.js"
+      "dest": "/api"
     },
     {
       "handle": "filesystem"
