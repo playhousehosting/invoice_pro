@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// Import all integration services
+// Import all integration services with error handling
 let salesforceService;
 try {
   salesforceService = require('./crm/salesforce');
@@ -10,28 +10,87 @@ try {
   salesforceService = null;
 }
 
-const hubspotService = require('./crm/hubspot');
-const zohoService = require('./crm/zoho');
-const googleDriveService = require('./storage/googleDrive');
-const dropboxService = require('./storage/dropbox');
-const oneDriveService = require('./storage/oneDrive');
-const docuSignService = require('./documents/docuSign');
-const emailService = require('./communication/email');
-const smsService = require('./communication/sms');
+let hubspotService;
+try {
+  hubspotService = require('./crm/hubspot');
+} catch (error) {
+  console.warn('HubSpot integration is not available:', error.message);
+  hubspotService = null;
+}
+
+let zohoService;
+try {
+  zohoService = require('./crm/zoho');
+} catch (error) {
+  console.warn('Zoho integration is not available:', error.message);
+  zohoService = null;
+}
+
+let googleDriveService;
+try {
+  googleDriveService = require('./storage/googleDrive');
+} catch (error) {
+  console.warn('Google Drive integration is not available:', error.message);
+  googleDriveService = null;
+}
+
+let dropboxService;
+try {
+  dropboxService = require('./storage/dropbox');
+} catch (error) {
+  console.warn('Dropbox integration is not available:', error.message);
+  dropboxService = null;
+}
+
+let oneDriveService;
+try {
+  oneDriveService = require('./storage/oneDrive');
+} catch (error) {
+  console.warn('OneDrive integration is not available:', error.message);
+  oneDriveService = null;
+}
+
+let docuSignService;
+try {
+  docuSignService = require('./documents/docuSign');
+} catch (error) {
+  console.warn('DocuSign integration is not available:', error.message);
+  docuSignService = null;
+}
+
+let emailService;
+try {
+  emailService = require('./communication/email');
+} catch (error) {
+  console.warn('Email integration is not available:', error.message);
+  emailService = null;
+}
+
+let smsService;
+try {
+  smsService = require('./communication/sms');
+} catch (error) {
+  console.warn('SMS integration is not available:', error.message);
+  smsService = null;
+}
 
 class IntegrationManager {
   constructor() {
     this.services = {
       ...(salesforceService && { salesforce: salesforceService }),
-      hubspot: hubspotService,
-      zoho: zohoService,
-      googleDrive: googleDriveService,
-      dropbox: dropboxService,
-      oneDrive: oneDriveService,
-      docuSign: docuSignService,
-      email: emailService,
-      sms: smsService
+      ...(hubspotService && { hubspot: hubspotService }),
+      ...(zohoService && { zoho: zohoService }),
+      ...(googleDriveService && { googleDrive: googleDriveService }),
+      ...(dropboxService && { dropbox: dropboxService }),
+      ...(oneDriveService && { oneDrive: oneDriveService }),
+      ...(docuSignService && { docuSign: docuSignService }),
+      ...(emailService && { email: emailService }),
+      ...(smsService && { sms: smsService })
     };
+
+    // Log available integrations
+    const availableIntegrations = Object.keys(this.services);
+    console.log('Available integrations:', availableIntegrations);
   }
 
   async getUserIntegrations(userId) {
