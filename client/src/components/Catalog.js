@@ -19,12 +19,14 @@ function Catalog() {
 
   const fetchCatalog = async () => {
     try {
-      const response = await api.get('/api/catalog');
-      setCatalog(response.data);
+      const response = await api.get('/catalog');
+      const items = response.data?.data || [];
+      setCatalog(Array.isArray(items) ? items : []);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching catalog:', error);
-      setError('Failed to load catalog items');
+      setError(error.response?.data?.message || 'Failed to load catalog items');
+      setCatalog([]); // Set empty array on error
       setLoading(false);
     }
   };

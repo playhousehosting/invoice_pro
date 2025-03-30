@@ -2,12 +2,12 @@ import axios from 'axios';
 
 // Get the base URL based on environment
 const getBaseUrl = () => {
-  if (process.env.NODE_ENV === 'production') {
-    // In production (Vercel), use relative path
-    return '/api';
+  // In production (Vercel), use relative path
+  if (window.location.hostname.includes('vercel.app')) {
+    return '';  // Use relative paths in production
   }
   // In development, use localhost
-  return 'http://localhost:5000/api';
+  return 'http://localhost:5000';
 };
 
 // Create an axios instance with base configuration
@@ -37,8 +37,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Handle token expiration
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      // Clear token on auth errors
       localStorage.removeItem('token');
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';

@@ -34,8 +34,8 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     if (config.isVercel) {
-      // In Vercel, allow same-origin and vercel.app domains
-      if (origin.includes('vercel.app') || origin === req.headers.host) {
+      // In Vercel, allow all vercel.app domains and the deployment URL
+      if (origin.includes('vercel.app')) {
         return callback(null, true);
       }
     } else if (origin === config.corsOrigin) {
@@ -46,7 +46,8 @@ app.use(cors({
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-vercel-forwarded-for'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Set-Cookie']
 }));
 
@@ -54,6 +55,7 @@ app.use(cors({
 app.use(cookieParser());
 
 // Parse JSON bodies
+app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
