@@ -27,6 +27,7 @@
     "google-auth-library": "^9.4.1",
     "googleapis": "^129.0.0",
     "hubspot": "^2.3.14",
+    "jsforce": "^1.11.1",
     "jsonwebtoken": "^9.0.0",
     "mailgun.js": "^9.3.0",
     "multer": "^1.4.5-lts.1",
