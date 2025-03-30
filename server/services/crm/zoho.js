@@ -1,12 +1,34 @@
+const zcrmsdk = require('zcrmsdk');
 const axios = require('axios');
 
 class ZohoCRMService {
   constructor() {
     this.baseURL = process.env.ZOHO_API_URL || 'https://www.zohoapis.com/crm/v3';
     this.accessToken = null;
+    this.initializeSDK();
   }
 
-  async authenticate() {
+  async initializeSDK() {
+    try {
+      const config = {
+        client_id: process.env.ZOHO_CLIENT_ID,
+        client_secret: process.env.ZOHO_CLIENT_SECRET,
+        redirect_url: process.env.ZOHO_REDIRECT_URI,
+        refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+        iamurl: 'https://accounts.zoho.com',
+        base_url: this.baseURL,
+        version: 'v3'
+      };
+
+      await zcrmsdk.initialize(config);
+      this.accessToken = await this.refreshAccessToken();
+    } catch (error) {
+      console.error('Zoho SDK initialization error:', error);
+      throw error;
+    }
+  }
+
+  async refreshAccessToken() {
     try {
       const response = await axios.post(
         'https://accounts.zoho.com/oauth/v2/token',
@@ -32,23 +54,26 @@ class ZohoCRMService {
   async makeRequest(method, endpoint, data = null) {
     try {
       if (!this.accessToken) {
-        await this.authenticate();
+        await this.refreshAccessToken();
       }
 
-      const response = await axios({
+      const headers = {
+        'Authorization': `Zoho-oauthtoken ${this.accessToken}`,
+        'Content-Type': 'application/json'
+      };
+
+      const config = {
         method,
         url: `${this.baseURL}/${endpoint}`,
-        headers: {
-          'Authorization': `Zoho-oauthtoken ${this.accessToken}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
         data
-      });
+      };
 
+      const response = await axios(config);
       return response.data;
     } catch (error) {
       if (error.response?.status === 401) {
-        await this.authenticate();
+        await this.refreshAccessToken();
         return this.makeRequest(method, endpoint, data);
       }
       throw error;
@@ -199,18 +224,8 @@ class ZohoCRMService {
 
   async searchRecords(module, criteria) {
     try {
-      const response = await this.makeRequest(
-        'get',
-        `${module}/search`,
-        null,
-        {
-          params: {
-            criteria: criteria
-          }
-        }
-      );
-
-      return response.data;
+      const searchParams = new URLSearchParams(criteria).toString();
+      return await this.makeRequest('get', `${module}/search?${searchParams}`);
     } catch (error) {
       console.error('Zoho search records error:', error);
       throw error;
@@ -264,8 +279,7 @@ class ZohoCRMService {
 
   async getCustomViews(module) {
     try {
-      const response = await this.makeRequest('get', `${module}/views`);
-      return response.data;
+      return await this.makeRequest('get', `${module}/views`);
     } catch (error) {
       console.error('Zoho get custom views error:', error);
       throw error;
