@@ -45,14 +45,22 @@ const IntegrationsManager = () => {
     try {
       setLoading(true);
       const [availableRes, userRes] = await Promise.all([
-        axios.get('/api/integrations/available'),
-        axios.get('/api/integrations/user')
+        api.get('/integrations/available'),
+        api.get('/integrations/user')
       ]);
-      setAvailableIntegrations(availableRes.data);
-      setUserIntegrations(userRes.data);
+      
+      // Ensure we have arrays even if the response is empty
+      const available = availableRes.data?.data || {};
+      const userInts = userRes.data?.data || {};
+      
+      setAvailableIntegrations(available);
+      setUserIntegrations(userInts);
+      setError(null);
     } catch (err) {
-      setError('Failed to load integrations');
-      console.error(err);
+      console.error('Failed to load integrations:', err);
+      setError(err.response?.data?.message || 'Failed to load integrations');
+      setAvailableIntegrations({});
+      setUserIntegrations(null);
     } finally {
       setLoading(false);
     }
