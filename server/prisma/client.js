@@ -1,54 +1,39 @@
 const { PrismaClient } = require('@prisma/client');
 
-// Prevent multiple instances of Prisma Client in development
-const globalForPrisma = global;
+let prisma;
 
-// Maximum number of connection retries
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000; // 1 second
+if (process.env.NODE_ENV === 'production') {
+  prisma = new PrismaClient();
+} else {
+  // Prevent multiple instances during development
+  if (!global.prisma) {
+    global.prisma = new PrismaClient({
+      log: ['query', 'error', 'warn'],
+    });
+  }
+  prisma = global.prisma;
+}
 
-async function createPrismaClient() {
-  let retries = 0;
-  
-  while (retries < MAX_RETRIES) {
-    try {
-      const prisma = new PrismaClient({
-        log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-        errorFormat: 'pretty',
-        rejectOnNotFound: false,
-      });
-
-      // Test the connection
-      await prisma.$connect();
-      console.log('Prisma Client connected successfully');
-      return prisma;
-    } catch (error) {
-      retries++;
-      console.error(`Failed to create Prisma Client (attempt ${retries}/${MAX_RETRIES}):`, error);
-      
-      if (retries === MAX_RETRIES) {
-        console.error('Max retries reached. Could not establish database connection.');
-        throw error;
-      }
-      
-      // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-    }
+// Verify connection
+async function verifyConnection() {
+  try {
+    // Test the connection by making a simple query
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('Prisma connection verified successfully');
+  } catch (error) {
+    console.error('Failed to verify Prisma connection:', error);
+    // Try to reconnect
+    await prisma.$connect();
   }
 }
 
-// Initialize Prisma Client with retries
-const prismaClientPromise = createPrismaClient().catch(error => {
-  console.error('Fatal: Failed to initialize Prisma Client:', error);
-  process.exit(1);
+// Initial connection verification
+verifyConnection().catch(console.error);
+
+// Handle connection errors
+prisma.$on('error', (e) => {
+  console.error('Prisma Client error:', e);
+  verifyConnection().catch(console.error);
 });
 
-// Export a proxy that waits for the client to be ready
-module.exports = new Proxy({}, {
-  get: (target, prop) => {
-    return async (...args) => {
-      const client = await prismaClientPromise;
-      return client[prop](...args);
-    };
-  }
-});
+module.exports = prisma;
