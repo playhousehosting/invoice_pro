@@ -23,14 +23,31 @@ const PORT = process.env.PORT || 5000;
 const config = {
   isVercel: process.env.VERCEL === '1',
   nodeEnv: process.env.NODE_ENV || 'development',
-  jwtSecret: process.env.JWT_SECRET || 'default_development_secret',
+  jwtSecret: process.env.VERCEL_JWT_SECRET || process.env.JWT_SECRET || 'default_development_secret',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000'
 };
 
-// Configure CORS
+// Configure CORS with proper Vercel headers
 app.use(cors({
-  origin: config.isVercel ? true : config.corsOrigin,
-  credentials: true
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (config.isVercel) {
+      // In Vercel, allow same-origin and vercel.app domains
+      if (origin.includes('vercel.app') || origin === req.headers.host) {
+        return callback(null, true);
+      }
+    } else if (origin === config.corsOrigin) {
+      // In development, only allow configured origin
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-vercel-forwarded-for'],
+  exposedHeaders: ['Set-Cookie']
 }));
 
 // Parse cookies
@@ -42,11 +59,16 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Request logging middleware
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  console.log('Headers:', req.headers);
-  if (req.cookies) {
-    console.log('Cookies:', req.cookies);
-  }
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${req.method} ${req.url}`);
+  console.log('Headers:', {
+    ...req.headers,
+    cookie: '***filtered***' // Don't log cookie contents
+  });
+  console.log('Environment:', {
+    isVercel: config.isVercel,
+    nodeEnv: config.nodeEnv
+  });
   next();
 });
 
@@ -58,59 +80,21 @@ app.use((err, req, res, next) => {
     stack: err.stack,
     path: req.path,
     method: req.method,
-    headers: req.headers,
-    cookies: req.cookies
+    headers: {
+      ...req.headers,
+      cookie: '***filtered***'
+    }
   });
   
   res.status(500).json({
-    error: config.nodeEnv === 'development' ? err.message : 'Internal server error',
-    stack: config.nodeEnv === 'development' ? err.stack : undefined,
-    timestamp
+    error: 'Internal server error',
+    requestId: req.headers['x-vercel-id'] || 'local'
   });
 });
 
-// Test database connection
-async function testDbConnection() {
-  try {
-    await prisma.$connect();
-    console.log('[Database] Successfully connected to the database');
-    return true;
-  } catch (error) {
-    console.error('[Database] Connection error:', {
-      message: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
-    });
-    return false;
-  }
-}
-
-// Health check route with DB connection status
-app.get('/api/health', async (req, res) => {
-  console.log('[Health Check] Received request');
-  const dbConnected = await testDbConnection();
-  
-  const response = {
-    message: 'Invoice API Server is running',
-    environment: config.isVercel ? 'production (Vercel)' : 'development',
-    timestamp: new Date().toISOString(),
-    database: dbConnected ? 'connected' : 'disconnected',
-    node_env: config.nodeEnv,
-    vercel: config.isVercel
-  };
-  
-  console.log('[Health Check] Response:', response);
-  
-  if (!dbConnected) {
-    return res.status(503).json(response);
-  }
-  
-  res.json(response);
-});
-
-// API routes
+// API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/invoice', authenticateToken, invoiceRoutes);
+app.use('/api/invoices', authenticateToken, invoiceRoutes);
 app.use('/api/address-book', authenticateToken, addressBookRoutes);
 app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
@@ -118,59 +102,41 @@ app.use('/api/templates', authenticateToken, templateRoutes);
 app.use('/api/catalog', authenticateToken, catalogRoutes);
 app.use('/api/integrations', authenticateToken, integrationsRoutes);
 
-// API 404 handler for /api routes
-app.use('/api/*', (req, res) => {
-  console.log(`[404] API route not found: ${req.method} ${req.url}`);
-  res.status(404).json({ 
-    message: 'API route not found',
-    path: req.path,
-    method: req.method,
+// Health check route
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    environment: config.nodeEnv,
+    isVercel: config.isVercel,
     timestamp: new Date().toISOString()
   });
 });
 
-// Serve static files for both development and Vercel
-const staticPath = path.join(__dirname, '../client/build');
-app.use(express.static(staticPath));
+// Handle Vercel's zero-config deployment
+if (config.isVercel) {
+  // Serve static files from the React app
+  app.use(express.static(path.join(__dirname, '../client/build')));
 
-// Catch-all route to serve index.html for client-side routing
-app.get('*', (req, res) => {
-  if (req.url.startsWith('/api/')) {
-    return res.status(404).json({ message: 'API route not found' });
-  }
-  res.sendFile(path.join(staticPath, 'index.html'));
-});
-
-// Connect to database before starting server
-if (!config.isVercel) {
-  testDbConnection()
-    .then((connected) => {
-      if (!connected) {
-        console.error('[Startup] Failed to connect to database');
-        process.exit(1);
-      }
-      app.listen(PORT, () => {
-        console.log(`[Server] Running on port ${PORT}`);
-      });
-    })
-    .catch((error) => {
-      console.error('[Startup] Failed to start server:', error);
-      process.exit(1);
-    });
+  // The "catchall" handler: for any request that doesn't
+  // match one above, send back React's index.html file.
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build/index.html'));
+  });
 }
 
-// Cleanup on server shutdown
-process.on('SIGTERM', async () => {
-  console.log('[Shutdown] SIGTERM received. Cleaning up...');
-  await prisma.$disconnect();
-  process.exit(0);
+const server = app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+  console.log('Environment:', {
+    isVercel: config.isVercel,
+    nodeEnv: config.nodeEnv
+  });
 });
 
-process.on('SIGINT', async () => {
-  console.log('[Shutdown] SIGINT received. Cleaning up...');
-  await prisma.$disconnect();
-  process.exit(0);
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Closing HTTP server...');
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
 });
-
-// Export the Express app for Vercel
-module.exports = app;

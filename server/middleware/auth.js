@@ -1,9 +1,9 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../prisma/client');
 
-// Use a default secret for development, but warn if it's used in production
-const JWT_SECRET = process.env.JWT_SECRET || 'default_development_secret';
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+// Use Vercel's JWT secret in production, fallback to local secret
+const JWT_SECRET = process.env.VERCEL_JWT_SECRET || process.env.JWT_SECRET || 'default_development_secret';
+if (process.env.NODE_ENV === 'production' && !process.env.VERCEL_JWT_SECRET && !process.env.JWT_SECRET) {
   console.warn('Warning: Using default JWT secret in production. This is not recommended.');
 }
 
@@ -23,27 +23,42 @@ const authenticateToken = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
+    
+    // Map Vercel JWT structure to our user object
+    req.user = {
+      id: decoded.userId || decoded.sub, // Vercel uses userId, fallback to sub
+      username: decoded.username,
+      email: decoded.email,
+      ownerId: decoded.ownerId, // Vercel team ID
+      role: decoded.role || 'USER' // Default to USER role if not specified
+    };
 
-    // Add userId from Vercel JWT if available
-    if (decoded.userId) {
-      req.user.id = decoded.userId;
-    }
+    // Log successful auth for debugging
+    console.log('Authentication successful:', {
+      userId: req.user.id,
+      username: req.user.username,
+      ownerId: req.user.ownerId
+    });
 
     next();
   } catch (error) {
-    console.error('Auth error:', error);
+    console.error('Auth error:', error, { token });
     return res.status(403).json({ message: 'Invalid or expired token.' });
   }
 };
 
 const isAdmin = async (req, res, next) => {
   try {
+    // For Vercel deployment, check if user is team owner
+    if (process.env.VERCEL === '1' && req.user.ownerId) {
+      req.user.role = 'ADMIN';
+      return next();
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.id }
     });
 
-    // Check role without schema validation
     if (!user || (user.role !== 'ADMIN' && user.role?.toString() !== 'ADMIN')) {
       return res.status(403).json({ message: 'Admin access required.' });
     }
