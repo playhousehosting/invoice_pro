@@ -1,31 +1,10 @@
-const zcrmsdk = require('zcrmsdk');
 const axios = require('axios');
 
 class ZohoCRMService {
   constructor() {
     this.baseURL = process.env.ZOHO_API_URL || 'https://www.zohoapis.com/crm/v3';
     this.accessToken = null;
-    this.initializeSDK();
-  }
-
-  async initializeSDK() {
-    try {
-      const config = {
-        client_id: process.env.ZOHO_CLIENT_ID,
-        client_secret: process.env.ZOHO_CLIENT_SECRET,
-        redirect_url: process.env.ZOHO_REDIRECT_URI,
-        refresh_token: process.env.ZOHO_REFRESH_TOKEN,
-        iamurl: 'https://accounts.zoho.com',
-        base_url: this.baseURL,
-        version: 'v3'
-      };
-
-      await zcrmsdk.initialize(config);
-      this.accessToken = await this.refreshAccessToken();
-    } catch (error) {
-      console.error('Zoho SDK initialization error:', error);
-      throw error;
-    }
+    this.refreshAccessToken(); // Initialize token
   }
 
   async refreshAccessToken() {
