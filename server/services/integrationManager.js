@@ -2,7 +2,14 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 // Import all integration services
-const salesforceService = require('./crm/salesforce');
+let salesforceService;
+try {
+  salesforceService = require('./crm/salesforce');
+} catch (error) {
+  console.warn('Salesforce integration is not available:', error.message);
+  salesforceService = null;
+}
+
 const hubspotService = require('./crm/hubspot');
 const zohoService = require('./crm/zoho');
 const googleDriveService = require('./storage/googleDrive');
@@ -15,7 +22,7 @@ const smsService = require('./communication/sms');
 class IntegrationManager {
   constructor() {
     this.services = {
-      salesforce: salesforceService,
+      ...(salesforceService && { salesforce: salesforceService }),
       hubspot: hubspotService,
       zoho: zohoService,
       googleDrive: googleDriveService,
