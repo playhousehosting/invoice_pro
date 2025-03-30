@@ -26,12 +26,15 @@ function TemplateManager() {
 
   const fetchTemplates = async () => {
     try {
-      const response = await api.get('/api/templates');
-      setTemplates(response.data);
+      const response = await api.get('/templates');
+      // Ensure templates is always an array
+      const templates = response.data?.data || [];
+      setTemplates(Array.isArray(templates) ? templates : []);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching templates:', error);
-      setError('Failed to load templates');
+      setError(error.response?.data?.message || 'Failed to load templates');
+      setTemplates([]); // Set empty array on error
       setLoading(false);
     }
   };
@@ -56,8 +59,13 @@ function TemplateManager() {
     setCurrentTemplate(template);
     setFormData({
       name: template.name,
-      companyInfo: template.companyInfo,
-      items: template.items
+      companyInfo: template.companyInfo || {
+        name: '',
+        address: '',
+        phone: '',
+        email: ''
+      },
+      items: template.items || [{ description: '', quantity: 1, rate: 0 }]
     });
   };
 
@@ -94,103 +102,152 @@ function TemplateManager() {
     });
   };
 
-  if (loading) return <div className="container mt-5">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mt-5">
-      <div className="row">
-        <div className="col-md-8">
-          <h2>Invoice Templates</h2>
-          {error && <div className="alert alert-danger">{error}</div>}
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex flex-col lg:flex-row gap-8">
+        <div className="lg:w-2/3">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Invoice Templates</h2>
+            <button
+              onClick={resetForm}
+              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+            >
+              New Template
+            </button>
+          </div>
           
-          <div className="list-group mt-3">
-            {templates.map((template) => (
-              <div key={template.id} className="list-group-item list-group-item-action">
-                <div className="d-flex w-100 justify-content-between align-items-center">
-                  <h5 className="mb-1">{template.name}</h5>
-                  <div>
-                    <button
-                      className="btn btn-primary btn-sm me-2"
-                      onClick={() => handleUseTemplate(template)}
-                    >
-                      Use Template
-                    </button>
-                    <button
-                      className="btn btn-secondary btn-sm me-2"
-                      onClick={() => handleEdit(template)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => handleDelete(template.id)}
-                    >
-                      Delete
-                    </button>
+          {error && (
+            <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {templates.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+              <p className="text-gray-500">No templates found. Create your first template!</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {templates.map((template) => (
+                <div 
+                  key={template.id} 
+                  className="bg-white shadow rounded-lg p-6 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900">{template.name}</h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Company: {template.companyInfo?.name || 'Not specified'}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Items: {template.items?.length || 0}
+                      </p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleUseTemplate(template)}
+                        className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                      >
+                        Use
+                      </button>
+                      <button
+                        onClick={() => handleEdit(template)}
+                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(template.id)}
+                        className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <p className="mb-1">Company: {template.companyInfo.name}</p>
-                <small>Items: {template.items.length}</small>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="col-md-4">
-          <div className="card">
-            <div className="card-header">
-              <h3>{currentTemplate ? 'Edit Template' : 'Create Template'}</h3>
-            </div>
-            <div className="card-body">
-              <form onSubmit={handleSubmit}>
-                <div className="mb-3">
-                  <label className="form-label">Template Name</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
+        <div className="lg:w-1/3">
+          <div className="bg-white shadow rounded-lg p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              {currentTemplate ? 'Edit Template' : 'Create Template'}
+            </h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Template Name
+                </label>
+                <input
+                  type="text"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
 
-                <div className="mb-3">
-                  <h5>Company Information</h5>
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-900">Company Information</h4>
+                <div>
+                  <label className="block text-sm text-gray-700">Company Name</label>
                   <input
                     type="text"
-                    className="form-control mb-2"
-                    placeholder="Company Name"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     value={formData.companyInfo.name}
                     onChange={(e) => setFormData({
                       ...formData,
                       companyInfo: { ...formData.companyInfo, name: e.target.value }
                     })}
-                    required
                   />
-                  <input
-                    type="text"
-                    className="form-control mb-2"
-                    placeholder="Address"
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700">Address</label>
+                  <textarea
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     value={formData.companyInfo.address}
                     onChange={(e) => setFormData({
                       ...formData,
                       companyInfo: { ...formData.companyInfo, address: e.target.value }
                     })}
                   />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700">Phone</label>
                   <input
                     type="tel"
-                    className="form-control mb-2"
-                    placeholder="Phone"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     value={formData.companyInfo.phone}
                     onChange={(e) => setFormData({
                       ...formData,
                       companyInfo: { ...formData.companyInfo, phone: e.target.value }
                     })}
                   />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700">Email</label>
                   <input
                     type="email"
-                    className="form-control"
-                    placeholder="Email"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     value={formData.companyInfo.email}
                     onChange={(e) => setFormData({
                       ...formData,
@@ -198,80 +255,26 @@ function TemplateManager() {
                     })}
                   />
                 </div>
+              </div>
 
-                <div className="mb-3">
-                  <h5>Default Items</h5>
-                  {formData.items.map((item, index) => (
-                    <div key={index} className="mb-2">
-                      <input
-                        type="text"
-                        className="form-control mb-2"
-                        placeholder="Description"
-                        value={item.description}
-                        onChange={(e) => {
-                          const newItems = [...formData.items];
-                          newItems[index].description = e.target.value;
-                          setFormData({ ...formData, items: newItems });
-                        }}
-                      />
-                      <div className="row">
-                        <div className="col">
-                          <input
-                            type="number"
-                            className="form-control"
-                            placeholder="Quantity"
-                            value={item.quantity}
-                            onChange={(e) => {
-                              const newItems = [...formData.items];
-                              newItems[index].quantity = Number(e.target.value);
-                              setFormData({ ...formData, items: newItems });
-                            }}
-                          />
-                        </div>
-                        <div className="col">
-                          <input
-                            type="number"
-                            className="form-control"
-                            placeholder="Rate"
-                            value={item.rate}
-                            onChange={(e) => {
-                              const newItems = [...formData.items];
-                              newItems[index].rate = Number(e.target.value);
-                              setFormData({ ...formData, items: newItems });
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  className="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                >
+                  {currentTemplate ? 'Update Template' : 'Create Template'}
+                </button>
+                {currentTemplate && (
                   <button
                     type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setFormData({
-                      ...formData,
-                      items: [...formData.items, { description: '', quantity: 1, rate: 0 }]
-                    })}
+                    onClick={resetForm}
+                    className="w-full mt-2 px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
                   >
-                    Add Item
+                    Cancel
                   </button>
-                </div>
-
-                <div className="d-grid gap-2">
-                  <button type="submit" className="btn btn-primary">
-                    {currentTemplate ? 'Update Template' : 'Save Template'}
-                  </button>
-                  {currentTemplate && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={resetForm}
-                    >
-                      Cancel Edit
-                    </button>
-                  )}
-                </div>
-              </form>
-            </div>
+                )}
+              </div>
+            </form>
           </div>
         </div>
       </div>
