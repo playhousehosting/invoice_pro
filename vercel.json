@@ -3,22 +3,14 @@
   "builds": [
     {
       "src": "server/vercel-server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "server/prisma/**/*",
-          "server/node_modules/.prisma/**/*",
-          "server/node_modules/@prisma/**/*"
-        ],
-        "buildCommand": "cd server && npm install && npx prisma generate"
-      }
+      "use": "@vercel/node"
     },
     {
       "src": "client/package.json",
       "use": "@vercel/static-build",
       "config": {
         "buildCommand": "cd client && npm install && npm run build",
-        "outputDirectory": "build"
+        "outputDirectory": "client/build"
       }
     }
   ],
@@ -28,24 +20,11 @@
       "dest": "server/vercel-server.js"
     },
     {
-      "src": "^/static/(.*)",
-      "dest": "/static/$1"
-    },
-    {
-      "src": "^/favicon.ico",
-      "dest": "/favicon.ico"
-    },
-    {
-      "src": "^/manifest.json",
-      "dest": "/manifest.json"
-    },
-    {
-      "src": "^/robots.txt",
-      "dest": "/robots.txt"
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "client/build/index.html"
     }
   ],
   "env": {
