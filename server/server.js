@@ -3,6 +3,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 const prisma = require('./prisma/client');
 const { authenticateToken } = require('./middleware/auth');
 
@@ -32,10 +33,20 @@ app.use(cors({
   credentials: true
 }));
 
+// Parse cookies
+app.use(cookieParser());
+
+// Parse JSON bodies
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   console.log('Headers:', req.headers);
+  if (req.cookies) {
+    console.log('Cookies:', req.cookies);
+  }
   next();
 });
 
@@ -47,7 +58,8 @@ app.use((err, req, res, next) => {
     stack: err.stack,
     path: req.path,
     method: req.method,
-    headers: req.headers
+    headers: req.headers,
+    cookies: req.cookies
   });
   
   res.status(500).json({
@@ -56,10 +68,6 @@ app.use((err, req, res, next) => {
     timestamp
   });
 });
-
-// Body parsing middleware
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
 
 // Test database connection
 async function testDbConnection() {

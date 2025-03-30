@@ -8,8 +8,14 @@ if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
 }
 
 const authenticateToken = (req, res, next) => {
+  // Try to get token from Authorization header
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  let token = authHeader && authHeader.split(' ')[1];
+
+  // If no token in header, try to get from _vercel_jwt cookie
+  if (!token && req.cookies && req.cookies._vercel_jwt) {
+    token = req.cookies._vercel_jwt;
+  }
 
   if (!token) {
     return res.status(401).json({ message: 'Authentication required.' });
@@ -18,6 +24,12 @@ const authenticateToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
+
+    // Add userId from Vercel JWT if available
+    if (decoded.userId) {
+      req.user.id = decoded.userId;
+    }
+
     next();
   } catch (error) {
     console.error('Auth error:', error);
