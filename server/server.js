@@ -13,6 +13,7 @@ const adminRoutes = require('./routes/admin');
 const uploadRoutes = require('./routes/upload');
 const templateRoutes = require('./routes/template');
 const catalogRoutes = require('./routes/catalog');
+const integrationsRoutes = require('./routes/integrations');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -80,6 +81,7 @@ app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
 app.use('/api/templates', authenticateToken, templateRoutes);
 app.use('/api/catalog', authenticateToken, catalogRoutes);
+app.use('/api/integrations', authenticateToken, integrationsRoutes);
 
 // Error handling for unhandled routes
 app.use((req, res) => {
